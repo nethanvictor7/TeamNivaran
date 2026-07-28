@@ -1,0 +1,578 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fabric
+  labels:
+    app.kubernetes.io/name: fabric
+    app.kubernetes.io/part-of: cdep
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fabric-network-data
+  namespace: fabric
+  labels:
+    app.kubernetes.io/name: fabric-network
+    app.kubernetes.io/part-of: cdep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fabric-network
+  namespace: fabric
+  labels:
+    app.kubernetes.io/name: fabric-network
+    app.kubernetes.io/part-of: cdep
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fabric-network
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fabric-network
+        app.kubernetes.io/part-of: cdep
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+      hostAliases:
+        - ip: 127.0.0.1
+          hostnames:
+            - orderer.example.com
+            - peer0.cdep.example.com
+            - peer0.audit.example.com
+      initContainers:
+        - name: crypto-bootstrap
+          image: hyperledger/fabric-tools:2.5.12
+          imagePullPolicy: IfNotPresent
+          command:
+            - bash
+            - -ec
+            - |
+              mkdir -p \
+                /fabric/crypto-config \
+                /fabric/channel-artifacts \
+                /fabric/data/orderer \
+                /fabric/data/peer-cdep \
+                /fabric/data/peer-audit
+              cp /config/crypto-config.yaml /fabric/crypto-config.yaml
+              cp /config/configtx.yaml /fabric/configtx.yaml
+              bash /config/bootstrap-crypto.sh
+          env:
+            - name: FABRIC_SKIP_STABLE_KEY_PERMISSION_CHANGE
+              value: "true"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: fabric-data
+              mountPath: /fabric
+            - name: network-config
+              mountPath: /config
+              readOnly: true
+        - name: chaincode-build
+          image: golang:1.23.10
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -ec
+            - |
+              cp -R /source/. /build/
+              cd /build
+              go mod download
+              go test ./...
+              CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" \
+                -o /output/evidence-proof .
+          env:
+            - name: GOTOOLCHAIN
+              value: local
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: chaincode-source
+              mountPath: /source
+              readOnly: true
+            - name: chaincode-build
+              mountPath: /output
+            - name: chaincode-work
+              mountPath: /build
+      containers:
+        - name: orderer
+          image: hyperledger/fabric-orderer:2.5.12
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FABRIC_CFG_PATH
+              value: /etc/hyperledger/fabric
+            - name: ORDERER_GENERAL_LISTENADDRESS
+              value: 0.0.0.0
+            - name: ORDERER_GENERAL_LISTENPORT
+              value: "7050"
+            - name: ORDERER_GENERAL_BOOTSTRAPMETHOD
+              value: none
+            - name: ORDERER_GENERAL_LOCALMSPID
+              value: OrdererMSP
+            - name: ORDERER_GENERAL_LOCALMSPDIR
+              value: /fabric/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/msp
+            - name: ORDERER_GENERAL_TLS_ENABLED
+              value: "true"
+            - name: ORDERER_GENERAL_TLS_PRIVATEKEY
+              value: /fabric/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.key
+            - name: ORDERER_GENERAL_TLS_CERTIFICATE
+              value: /fabric/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+            - name: ORDERER_GENERAL_TLS_ROOTCAS
+              value: "[/fabric/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt]"
+            - name: ORDERER_CHANNELPARTICIPATION_ENABLED
+              value: "true"
+            - name: ORDERER_ADMIN_LISTENADDRESS
+              value: 0.0.0.0:9443
+            - name: ORDERER_ADMIN_TLS_ENABLED
+              value: "true"
+            - name: ORDERER_ADMIN_TLS_PRIVATEKEY
+              value: /fabric/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.key
+            - name: ORDERER_ADMIN_TLS_CERTIFICATE
+              value: /fabric/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+            - name: ORDERER_ADMIN_TLS_CLIENTROOTCAS
+              value: "[/fabric/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt]"
+            - name: ORDERER_OPERATIONS_LISTENADDRESS
+              value: 0.0.0.0:9444
+            - name: ORDERER_METRICS_PROVIDER
+              value: prometheus
+            - name: ORDERER_FILELEDGER_LOCATION
+              value: /fabric/data/orderer/ledger
+            - name: ORDERER_CONSENSUS_WALDIR
+              value: /fabric/data/orderer/etcdraft/wal
+            - name: ORDERER_CONSENSUS_SNAPDIR
+              value: /fabric/data/orderer/etcdraft/snapshot
+          ports:
+            - name: orderer
+              containerPort: 7050
+            - name: orderer-admin
+              containerPort: 9443
+            - name: orderer-ops
+              containerPort: 9444
+          startupProbe:
+            tcpSocket:
+              port: orderer
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: orderer
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: orderer
+            periodSeconds: 20
+            failureThreshold: 6
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi
+          volumeMounts:
+            - name: fabric-data
+              mountPath: /fabric
+        - name: peer-cdep
+          image: hyperledger/fabric-peer:2.5.12
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FABRIC_CFG_PATH
+              value: /etc/hyperledger/fabric
+            - name: CORE_PEER_ID
+              value: peer0.cdep.example.com
+            - name: CORE_PEER_ADDRESS
+              value: peer0.cdep.example.com:7051
+            - name: CORE_PEER_LISTENADDRESS
+              value: 0.0.0.0:7051
+            - name: CORE_PEER_CHAINCODEADDRESS
+              value: peer0.cdep.example.com:7052
+            - name: CORE_PEER_CHAINCODELISTENADDRESS
+              value: 0.0.0.0:7052
+            - name: CORE_PEER_GOSSIP_EXTERNALENDPOINT
+              value: peer0.cdep.example.com:7051
+            - name: CORE_PEER_GOSSIP_BOOTSTRAP
+              value: peer0.cdep.example.com:7051
+            - name: CORE_PEER_LOCALMSPID
+              value: CDEPMSP
+            - name: CORE_PEER_MSPCONFIGPATH
+              value: /fabric/crypto-config/peerOrganizations/cdep.example.com/peers/peer0.cdep.example.com/msp
+            - name: CORE_PEER_TLS_ENABLED
+              value: "true"
+            - name: CORE_PEER_TLS_CERT_FILE
+              value: /fabric/crypto-config/peerOrganizations/cdep.example.com/peers/peer0.cdep.example.com/tls/server.crt
+            - name: CORE_PEER_TLS_KEY_FILE
+              value: /fabric/crypto-config/peerOrganizations/cdep.example.com/peers/peer0.cdep.example.com/tls/server.key
+            - name: CORE_PEER_TLS_ROOTCERT_FILE
+              value: /fabric/crypto-config/peerOrganizations/cdep.example.com/peers/peer0.cdep.example.com/tls/ca.crt
+            - name: CORE_LEDGER_STATE_STATEDATABASE
+              value: goleveldb
+            - name: CORE_PEER_FILESYSTEMPATH
+              value: /fabric/data/peer-cdep
+            - name: CORE_OPERATIONS_LISTENADDRESS
+              value: 0.0.0.0:9445
+            - name: CORE_METRICS_PROVIDER
+              value: prometheus
+            - name: CORE_CHAINCODE_EXTERNALBUILDERS
+              value: '[{"name":"ccaas_builder","path":"/opt/hyperledger/ccaas_builder","propagateEnvironment":["CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG"]}]'
+          command:
+            - peer
+            - node
+            - start
+          ports:
+            - name: peer-cdep
+              containerPort: 7051
+            - name: peer-cdep-cc
+              containerPort: 7052
+            - name: peer-cdep-ops
+              containerPort: 9445
+          startupProbe:
+            tcpSocket:
+              port: peer-cdep
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command:
+                - peer
+                - node
+                - status
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: peer-cdep
+            periodSeconds: 20
+            failureThreshold: 6
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: fabric-data
+              mountPath: /fabric
+        - name: peer-audit
+          image: hyperledger/fabric-peer:2.5.12
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FABRIC_CFG_PATH
+              value: /etc/hyperledger/fabric
+            - name: CORE_PEER_ID
+              value: peer0.audit.example.com
+            - name: CORE_PEER_ADDRESS
+              value: peer0.audit.example.com:8051
+            - name: CORE_PEER_LISTENADDRESS
+              value: 0.0.0.0:8051
+            - name: CORE_PEER_CHAINCODEADDRESS
+              value: peer0.audit.example.com:8052
+            - name: CORE_PEER_CHAINCODELISTENADDRESS
+              value: 0.0.0.0:8052
+            - name: CORE_PEER_GOSSIP_EXTERNALENDPOINT
+              value: peer0.audit.example.com:8051
+            - name: CORE_PEER_GOSSIP_BOOTSTRAP
+              value: peer0.audit.example.com:8051
+            - name: CORE_PEER_LOCALMSPID
+              value: AuditMSP
+            - name: CORE_PEER_MSPCONFIGPATH
+              value: /fabric/crypto-config/peerOrganizations/audit.example.com/peers/peer0.audit.example.com/msp
+            - name: CORE_PEER_TLS_ENABLED
+              value: "true"
+            - name: CORE_PEER_TLS_CERT_FILE
+              value: /fabric/crypto-config/peerOrganizations/audit.example.com/peers/peer0.audit.example.com/tls/server.crt
+            - name: CORE_PEER_TLS_KEY_FILE
+              value: /fabric/crypto-config/peerOrganizations/audit.example.com/peers/peer0.audit.example.com/tls/server.key
+            - name: CORE_PEER_TLS_ROOTCERT_FILE
+              value: /fabric/crypto-config/peerOrganizations/audit.example.com/peers/peer0.audit.example.com/tls/ca.crt
+            - name: CORE_LEDGER_STATE_STATEDATABASE
+              value: goleveldb
+            - name: CORE_PEER_FILESYSTEMPATH
+              value: /fabric/data/peer-audit
+            - name: CORE_OPERATIONS_LISTENADDRESS
+              value: 0.0.0.0:9446
+            - name: CORE_METRICS_PROVIDER
+              value: prometheus
+            - name: CORE_CHAINCODE_EXTERNALBUILDERS
+              value: '[{"name":"ccaas_builder","path":"/opt/hyperledger/ccaas_builder","propagateEnvironment":["CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG"]}]'
+          command:
+            - peer
+            - node
+            - start
+          ports:
+            - name: peer-audit
+              containerPort: 8051
+            - name: peer-audit-cc
+              containerPort: 8052
+            - name: peer-audit-ops
+              containerPort: 9446
+          startupProbe:
+            tcpSocket:
+              port: peer-audit
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command:
+                - peer
+                - node
+                - status
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: peer-audit
+            periodSeconds: 20
+            failureThreshold: 6
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: fabric-data
+              mountPath: /fabric
+        - name: proof-chaincode
+          image: alpine:3.23
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -ec
+            - |
+              until [ -s /fabric/channel-artifacts/package-id ]; do
+                sleep 2
+              done
+              export CHAINCODE_ID="$(cat /fabric/channel-artifacts/package-id)"
+              exec /chaincode/evidence-proof
+          env:
+            - name: CHAINCODE_SERVER_ADDRESS
+              value: 0.0.0.0:9999
+          ports:
+            - name: chaincode
+              containerPort: 9999
+          startupProbe:
+            tcpSocket:
+              port: chaincode
+            periodSeconds: 5
+            failureThreshold: 90
+          readinessProbe:
+            tcpSocket:
+              port: chaincode
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: chaincode
+            periodSeconds: 20
+            failureThreshold: 6
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: fabric-data
+              mountPath: /fabric
+              readOnly: true
+            - name: chaincode-build
+              mountPath: /chaincode
+              readOnly: true
+        - name: fabric-admin
+          image: hyperledger/fabric-tools:2.5.12
+          imagePullPolicy: IfNotPresent
+          command:
+            - bash
+            - -ec
+            - |
+              bash /config/deploy-network-ccaas.sh
+              exec tail -f /dev/null
+          env:
+            - name: FABRIC_CFG_PATH
+              value: /etc/hyperledger/fabric
+            - name: FABRIC_ROOT
+              value: /fabric
+            - name: FABRIC_CHANNEL_NAME
+              value: cdep-proof-channel
+            - name: FABRIC_CHAINCODE_NAME
+              value: cdep-proof-registry
+            - name: FABRIC_CHAINCODE_ADDRESS
+              value: 127.0.0.1:9999
+            - name: CORE_PEER_TLS_ENABLED
+              value: "true"
+            - name: CORE_PEER_LOCALMSPID
+              value: CDEPMSP
+            - name: CORE_PEER_MSPCONFIGPATH
+              value: /fabric/crypto-config/peerOrganizations/cdep.example.com/users/Admin@cdep.example.com/msp
+            - name: CORE_PEER_TLS_ROOTCERT_FILE
+              value: /fabric/crypto-config/peerOrganizations/cdep.example.com/peers/peer0.cdep.example.com/tls/ca.crt
+            - name: CORE_PEER_ADDRESS
+              value: peer0.cdep.example.com:7051
+          readinessProbe:
+            exec:
+              command:
+                - bash
+                - -ec
+                - test -f /fabric/channel-artifacts/deployment-ready
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 90
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: fabric-data
+              mountPath: /fabric
+            - name: network-config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: fabric-data
+          persistentVolumeClaim:
+            claimName: fabric-network-data
+        - name: network-config
+          configMap:
+            name: fabric-network-config
+            defaultMode: 0555
+        - name: chaincode-source
+          configMap:
+            name: fabric-chaincode-source
+        - name: chaincode-build
+          emptyDir: {}
+        - name: chaincode-work
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: peer0-cdep
+  namespace: fabric
+  labels:
+    app.kubernetes.io/name: fabric-network
+    app.kubernetes.io/part-of: cdep
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: fabric-network
+  ports:
+    - name: peer
+      port: 7051
+      targetPort: peer-cdep
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: peer0-audit
+  namespace: fabric
+  labels:
+    app.kubernetes.io/name: fabric-network
+    app.kubernetes.io/part-of: cdep
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: fabric-network
+  ports:
+    - name: peer
+      port: 8051
+      targetPort: peer-audit
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fabric-orderer
+  namespace: fabric
+  labels:
+    app.kubernetes.io/name: fabric-network
+    app.kubernetes.io/part-of: cdep
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: fabric-network
+  ports:
+    - name: orderer
+      port: 7050
+      targetPort: orderer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cdep-proof-registry
+  namespace: fabric
+  labels:
+    app.kubernetes.io/name: fabric-network
+    app.kubernetes.io/part-of: cdep
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: fabric-network
+  ports:
+    - name: chaincode
+      port: 9999
+      targetPort: chaincode

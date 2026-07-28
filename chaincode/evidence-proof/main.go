@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -387,6 +388,25 @@ func canonicalSHA256(value any) (string, error) {
 }
 
 func main() {
+	serverAddress := os.Getenv("CHAINCODE_SERVER_ADDRESS")
+	chaincodeID := os.Getenv("CHAINCODE_ID")
+	if serverAddress != "" || chaincodeID != "" {
+		if serverAddress == "" || chaincodeID == "" {
+			panic("CHAINCODE_SERVER_ADDRESS and CHAINCODE_ID must both be set")
+		}
+		server := &shim.ChaincodeServer{
+			CCID:    chaincodeID,
+			Address: serverAddress,
+			CC:      &ProofChaincode{},
+			TLSProps: shim.TLSProperties{
+				Disabled: true,
+			},
+		}
+		if err := server.Start(); err != nil {
+			panic(err)
+		}
+		return
+	}
 	if err := shim.Start(&ProofChaincode{}); err != nil {
 		panic(err)
 	}

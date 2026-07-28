@@ -6,7 +6,7 @@ workflows, controlled AI decision support, and provider-neutral ledger proofs
 in one auditable system.
 
 The current local implementation runs as an npm workspace monorepo on Docker
-Compose. It uses React, TypeScript, NestJS/Fastify, PostgreSQL, Kafka, Redis,
+Compose. It uses React, TypeScript, NestJS/Fastify, PostgreSQL, Kafka,
 Garage S3-compatible storage, ClamAV, and a real two-organization Hyperledger
 Fabric network.
 
@@ -45,7 +45,7 @@ Browser
   │       └── /api reverse proxy
   │
   └── API Gateway :3000
-          ├── Identity & Access :3001 ── PostgreSQL + Redis
+          ├── Identity & Access :3001 ── PostgreSQL
           ├── Case Service :3002 ─────── PostgreSQL
           ├── Integration Service :3003  PostgreSQL + Kafka
           ├── Evidence Service :3004 ─── PostgreSQL + Garage + ClamAV
@@ -76,7 +76,6 @@ HTTP APIs and versioned Kafka events.
 | AI Assessment Service       | MockCortex assessments, governance, policies and operations                 | `http://localhost:3006` |
 | Ledger Service              | Provider-neutral proof lifecycle, verification and reconciliation           | `http://localhost:3007` |
 | PostgreSQL                  | Isolated application databases                                              | `localhost:5432`        |
-| Redis                       | Refresh-session and identity runtime support                                | `localhost:6379`        |
 | Kafka                       | Versioned domain events and transactional outboxes                          | `localhost:29092`       |
 | Garage S3 API               | Evidence quarantine and canonical objects                                   | `http://localhost:3900` |
 | ClamAV                      | Evidence malware scanning                                                   | `localhost:3310`        |
@@ -93,7 +92,6 @@ HTTP APIs and versioned Kafka events.
 - NestJS 11 with Fastify
 - Prisma with PostgreSQL 17
 - Kafka in KRaft mode
-- Redis 8
 - Garage S3-compatible object storage
 - ClamAV 1.5
 - Hyperledger Fabric 2.5, Fabric CA 1.5, Raft, LevelDB, and Go chaincode
@@ -161,7 +159,8 @@ commit `.env`.
 
 Important local values include:
 
-- All PostgreSQL application passwords
+- The shared `DATABASE_PASSWORD` used by `cdep_admin`
+- The local-only service-role passwords used by database bootstrap
 - `BOOTSTRAP_ADMIN_PASSWORD`
 - `INTERNAL_SERVICE_TOKEN`
 - `AI_OUTPUT_ENCRYPTION_KEY` with at least 32 random characters
@@ -485,7 +484,7 @@ validator credentials without manually exporting them.
 | Profile            | Purpose                                                                                 |
 | ------------------ | --------------------------------------------------------------------------------------- |
 | `local`            | Complete local application platform, including Fabric dependencies                      |
-| `infrastructure`   | PostgreSQL, Redis, Kafka, Garage, ClamAV and bootstrap jobs                             |
+| `infrastructure`   | PostgreSQL, Kafka, Garage, ClamAV and bootstrap jobs                                    |
 | `fabric`           | Fabric CAs, peers, orderer, crypto bootstrap, lifecycle and Ledger Service dependencies |
 | `integration-demo` | Optional read-only PostgreSQL source used by connector validation                       |
 
@@ -701,7 +700,7 @@ ID with a different payload.
 
 | Data                                                        | Authoritative storage               |
 | ----------------------------------------------------------- | ----------------------------------- |
-| Users, roles, permissions and refresh sessions              | Identity PostgreSQL and Redis       |
+| Users, roles, permissions and refresh sessions              | Identity PostgreSQL                 |
 | Decision cases, parties and assignments                     | Case PostgreSQL                     |
 | Connector definitions, triggers and checkpoints             | Integration PostgreSQL              |
 | Evidence metadata, versions, scan and access records        | Evidence PostgreSQL                 |
@@ -744,8 +743,23 @@ rotation and observability.
 Images do not change between local and managed deployments. Supply managed
 endpoints and credentials through environment variables or secret mounts.
 
+The staged GKE manifests, secret bootstrap, deployment order, and Fabric
+readiness gate are documented in
+[`infrastructure/kubernetes/README.md`](infrastructure/kubernetes/README.md).
+
 ```env
-DATABASE_URL=postgresql://service-user:secret@managed-postgres:5432/cdep_identity?sslmode=require
+DATABASE_HOST=managed-postgres
+DATABASE_PORT=5432
+DATABASE_USER=cdep_admin
+DATABASE_PASSWORD=secret-reference
+DATABASE_SSL_MODE=require
+IDENTITY_DB_NAME=cdep_identity
+CASE_DB_NAME=cdep_case
+INTEGRATION_DB_NAME=cdep_integration
+EVIDENCE_DB_NAME=cdep_evidence
+WORKFLOW_DB_NAME=cdep_workflow
+AI_DB_NAME=cdep_ai
+LEDGER_DB_NAME=cdep_ledger
 KAFKA_BROKERS=broker-1:9092,broker-2:9092,broker-3:9092
 KAFKA_SECURITY_PROTOCOL=SASL_SSL
 KAFKA_SASL_MECHANISM=SCRAM-SHA-512
@@ -758,6 +772,70 @@ OBJECT_STORAGE_ACCESS_KEY=secret-reference
 OBJECT_STORAGE_SECRET_KEY=secret-reference
 CLAMAV_HOST=managed-scanner.internal
 ```
+
+### AlloyDB PostgreSQL
+
+The checked-in AlloyDB template is
+[`infrastructure/kubernetes/alloydb-config.yaml`](infrastructure/kubernetes/alloydb-config.yaml).
+It configures the shared host, port, user, TLS mode, and the seven
+service-specific database names. The password is intentionally not present in
+Git.
+
+Create or rotate the password Secret from an interactive shell. The password is
+read without echo and is not written into the shell command history:
+
+```bash
+kubectl create namespace cdep --dry-run=client -o yaml | kubectl apply -f -
+read -r -s CDEP_ALLOYDB_PASSWORD
+kubectl -n cdep create secret generic alloydb-credentials \
+  --from-literal=DATABASE_PASSWORD="${CDEP_ALLOYDB_PASSWORD}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+unset CDEP_ALLOYDB_PASSWORD
+kubectl apply -f infrastructure/kubernetes/alloydb-config.yaml
+```
+
+Every migration job and database-backed service must import the ConfigMap,
+read the password from the Secret, and build its `DATABASE_URL` with the
+service's own database name. Kubernetes expands environment references in
+declaration order:
+
+```yaml
+envFrom:
+  - configMapRef:
+      name: alloydb-config
+env:
+  - name: DATABASE_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: alloydb-credentials
+        key: DATABASE_PASSWORD
+  - name: DATABASE_URL
+    value: >-
+      postgresql://$(DATABASE_USER):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(IDENTITY_DB_NAME)?sslmode=$(DATABASE_SSL_MODE)
+```
+
+Use the corresponding database-name variable for each workload:
+
+| Workload                      | Database variable     | Database name      |
+| ----------------------------- | --------------------- | ------------------ |
+| Identity Access Service       | `IDENTITY_DB_NAME`    | `cdep_identity`    |
+| Case Service                  | `CASE_DB_NAME`        | `cdep_case`        |
+| Integration Ingestion Service | `INTEGRATION_DB_NAME` | `cdep_integration` |
+| Evidence Service              | `EVIDENCE_DB_NAME`    | `cdep_evidence`    |
+| Validation Workflow Service   | `WORKFLOW_DB_NAME`    | `cdep_workflow`    |
+| AI Assessment Service         | `AI_DB_NAME`          | `cdep_ai`          |
+| Ledger Service                | `LEDGER_DB_NAME`      | `cdep_ledger`      |
+
+For Compose-based managed execution, copy `.env.alloydb.example` to a
+non-versioned environment file, populate `DATABASE_PASSWORD` from the secret
+store, and pass it with `--env-file`. Compose constructs all service and
+migration URLs from the shared connection values and the individual
+`*_DB_NAME`.
+
+Before deployment, ensure the GKE workload network can route to the AlloyDB
+address on port `5432`. The database account also needs `CONNECT`, schema
+`USAGE`, schema `CREATE`, and object privileges required by Prisma migrations
+for every listed database.
 
 Fabric client certificates, private keys, and TLS roots must be mounted
 read-only from managed secrets. Never print PEM material, connection profiles,

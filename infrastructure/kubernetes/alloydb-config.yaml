@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloydb-config
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: alloydb
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: cdep
+data:
+  DATABASE_HOST: "10.128.15.209"
+  DATABASE_PORT: "5432"
+  DATABASE_USER: cdep_admin
+  DATABASE_SSL_MODE: require
+  IDENTITY_DB_NAME: cdep_identity
+  CASE_DB_NAME: cdep_case
+  INTEGRATION_DB_NAME: cdep_integration
+  EVIDENCE_DB_NAME: cdep_evidence
+  WORKFLOW_DB_NAME: cdep_workflow
+  AI_DB_NAME: cdep_ai
+  LEDGER_DB_NAME: cdep_ledger

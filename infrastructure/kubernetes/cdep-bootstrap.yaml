@@ -1,0 +1,97 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: identity-seed
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: identity-seed
+    app.kubernetes.io/part-of: cdep
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: gitlab-registry
+      containers:
+        - name: seed
+          image: registry.gitlab.com/reboot4443731/cdep/identity-access-service:latest
+          imagePullPolicy: Always
+          command:
+            - ./node_modules/.bin/tsx
+            - apps/identity-access-service/prisma/seed.ts
+          envFrom:
+            - configMapRef:
+                name: cdep-bootstrap-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: IDENTITY_DATABASE_URL
+            - name: BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: BOOTSTRAP_ADMIN_PASSWORD
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: evidence-storage-bootstrap
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: evidence-storage-bootstrap
+    app.kubernetes.io/part-of: cdep
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: gitlab-registry
+      initContainers:
+        - name: wait-for-garage
+          image: busybox:1.37
+          command:
+            - sh
+            - -ec
+            - until nc -z garage 3900; do sleep 5; done
+      containers:
+        - name: bootstrap
+          image: registry.gitlab.com/reboot4443731/cdep/evidence-service:latest
+          imagePullPolicy: Always
+          command:
+            - node
+            - apps/evidence-service/dist/src/storage-bootstrap.js
+          envFrom:
+            - configMapRef:
+                name: cdep-runtime-config
+          env:
+            - name: PORT
+              value: "3004"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: EVIDENCE_DATABASE_URL
+            - name: EVIDENCE_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: EVIDENCE_DATABASE_URL
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: INTERNAL_SERVICE_TOKEN
+            - name: OBJECT_STORAGE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: OBJECT_STORAGE_ACCESS_KEY
+            - name: OBJECT_STORAGE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: OBJECT_STORAGE_SECRET_KEY

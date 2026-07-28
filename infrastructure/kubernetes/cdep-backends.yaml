@@ -1,0 +1,710 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-access-service
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: identity-access-service
+    app.kubernetes.io/part-of: cdep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: identity-access-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: identity-access-service
+        app.kubernetes.io/part-of: cdep
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: gitlab-registry
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: identity-access-service
+          image: registry.gitlab.com/reboot4443731/cdep/identity-access-service:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: cdep-runtime-config
+          env:
+            - name: PORT
+              value: "3001"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: IDENTITY_DATABASE_URL
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: INTERNAL_SERVICE_TOKEN
+            - name: JWT_PRIVATE_KEY_BASE64
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: JWT_PRIVATE_KEY_BASE64
+            - name: JWT_PUBLIC_KEY_BASE64
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: JWT_PUBLIC_KEY_BASE64
+          ports:
+            - name: http
+              containerPort: 3001
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: identity-access-service
+  namespace: cdep
+spec:
+  selector:
+    app.kubernetes.io/name: identity-access-service
+  ports:
+    - name: http
+      port: 3001
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: case-service
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: case-service
+    app.kubernetes.io/part-of: cdep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: case-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: case-service
+        app.kubernetes.io/part-of: cdep
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: gitlab-registry
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: case-service
+          image: registry.gitlab.com/reboot4443731/cdep/case-service:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: cdep-runtime-config
+          env:
+            - name: PORT
+              value: "3002"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: CASE_DATABASE_URL
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: INTERNAL_SERVICE_TOKEN
+          ports:
+            - name: http
+              containerPort: 3002
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: case-service
+  namespace: cdep
+spec:
+  selector:
+    app.kubernetes.io/name: case-service
+  ports:
+    - name: http
+      port: 3002
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: integration-ingestion-service
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: integration-ingestion-service
+    app.kubernetes.io/part-of: cdep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: integration-ingestion-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: integration-ingestion-service
+        app.kubernetes.io/part-of: cdep
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: gitlab-registry
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: integration-ingestion-service
+          image: registry.gitlab.com/reboot4443731/cdep/integration-ingestion-service:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: cdep-runtime-config
+          env:
+            - name: PORT
+              value: "3003"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: INTEGRATION_DATABASE_URL
+            - name: INTEGRATION_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: INTEGRATION_DATABASE_URL
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: INTERNAL_SERVICE_TOKEN
+            - name: CONNECTOR_CREDENTIAL_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: CONNECTOR_CREDENTIAL_ENCRYPTION_KEY
+          ports:
+            - name: http
+              containerPort: 3003
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: integration-ingestion-service
+  namespace: cdep
+spec:
+  selector:
+    app.kubernetes.io/name: integration-ingestion-service
+  ports:
+    - name: http
+      port: 3003
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: evidence-service
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: evidence-service
+    app.kubernetes.io/part-of: cdep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: evidence-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: evidence-service
+        app.kubernetes.io/part-of: cdep
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: gitlab-registry
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: evidence-service
+          image: registry.gitlab.com/reboot4443731/cdep/evidence-service:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: cdep-runtime-config
+          env:
+            - name: PORT
+              value: "3004"
+            - name: EVIDENCE_SERVICE_PORT
+              value: "3004"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: EVIDENCE_DATABASE_URL
+            - name: EVIDENCE_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: EVIDENCE_DATABASE_URL
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: INTERNAL_SERVICE_TOKEN
+            - name: OBJECT_STORAGE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: OBJECT_STORAGE_ACCESS_KEY
+            - name: OBJECT_STORAGE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: OBJECT_STORAGE_SECRET_KEY
+          ports:
+            - name: http
+              containerPort: 3004
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: evidence-service
+  namespace: cdep
+spec:
+  selector:
+    app.kubernetes.io/name: evidence-service
+  ports:
+    - name: http
+      port: 3004
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: validation-workflow-service
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: validation-workflow-service
+    app.kubernetes.io/part-of: cdep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: validation-workflow-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: validation-workflow-service
+        app.kubernetes.io/part-of: cdep
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: gitlab-registry
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: validation-workflow-service
+          image: registry.gitlab.com/reboot4443731/cdep/validation-workflow-service:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: cdep-runtime-config
+          env:
+            - name: PORT
+              value: "3005"
+            - name: WORKFLOW_SERVICE_PORT
+              value: "3005"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: WORKFLOW_DATABASE_URL
+            - name: WORKFLOW_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: WORKFLOW_DATABASE_URL
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: INTERNAL_SERVICE_TOKEN
+          ports:
+            - name: http
+              containerPort: 3005
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: validation-workflow-service
+  namespace: cdep
+spec:
+  selector:
+    app.kubernetes.io/name: validation-workflow-service
+  ports:
+    - name: http
+      port: 3005
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-assessment-service
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: ai-assessment-service
+    app.kubernetes.io/part-of: cdep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-assessment-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ai-assessment-service
+        app.kubernetes.io/part-of: cdep
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: gitlab-registry
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ai-assessment-service
+          image: registry.gitlab.com/reboot4443731/cdep/ai-assessment-service:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: cdep-runtime-config
+          env:
+            - name: PORT
+              value: "3006"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: AI_DATABASE_URL
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: INTERNAL_SERVICE_TOKEN
+            - name: AI_OUTPUT_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: AI_OUTPUT_ENCRYPTION_KEY
+          ports:
+            - name: http
+              containerPort: 3006
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-assessment-service
+  namespace: cdep
+spec:
+  selector:
+    app.kubernetes.io/name: ai-assessment-service
+  ports:
+    - name: http
+      port: 3006
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-service
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: ledger-service
+    app.kubernetes.io/part-of: cdep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ledger-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ledger-service
+        app.kubernetes.io/part-of: cdep
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: gitlab-registry
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ledger-service
+          image: registry.gitlab.com/reboot4443731/cdep/ledger-service:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: cdep-runtime-config
+          env:
+            - name: PORT
+              value: "3007"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: LEDGER_DATABASE_URL
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: INTERNAL_SERVICE_TOKEN
+          ports:
+            - name: http
+              containerPort: 3007
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - >-
+                  fetch('http://localhost:3007/health/ready')
+                  .then(r => r.json()).then(v => {
+                  if (v.status !== 'ok') process.exit(1); })
+                  .catch(() => process.exit(1))
+            periodSeconds: 15
+            timeoutSeconds: 8
+            failureThreshold: 4
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          volumeMounts:
+            - name: fabric-client
+              mountPath: /fabric/client
+              readOnly: true
+      volumes:
+        - name: fabric-client
+          secret:
+            secretName: fabric-client-identity
+            optional: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger-service
+  namespace: cdep
+spec:
+  selector:
+    app.kubernetes.io/name: ledger-service
+  ports:
+    - name: http
+      port: 3007
+      targetPort: http

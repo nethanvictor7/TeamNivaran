@@ -1,0 +1,223 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: identity-migrate
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: identity-migrate
+    app.kubernetes.io/part-of: cdep
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: gitlab-registry
+      containers:
+        - name: migrate
+          image: registry.gitlab.com/reboot4443731/cdep/identity-access-service:latest
+          imagePullPolicy: Always
+          command:
+            - ./node_modules/.bin/prisma
+            - migrate
+            - deploy
+            - --schema
+            - apps/identity-access-service/prisma/schema.prisma
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: IDENTITY_DATABASE_URL
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: case-migrate
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: case-migrate
+    app.kubernetes.io/part-of: cdep
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: gitlab-registry
+      containers:
+        - name: migrate
+          image: registry.gitlab.com/reboot4443731/cdep/case-service:latest
+          imagePullPolicy: Always
+          command:
+            - ./node_modules/.bin/prisma
+            - migrate
+            - deploy
+            - --schema
+            - apps/case-service/prisma/schema.prisma
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: CASE_DATABASE_URL
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: integration-migrate
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: integration-migrate
+    app.kubernetes.io/part-of: cdep
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: gitlab-registry
+      containers:
+        - name: migrate
+          image: registry.gitlab.com/reboot4443731/cdep/integration-ingestion-service:latest
+          imagePullPolicy: Always
+          command:
+            - ./node_modules/.bin/prisma
+            - migrate
+            - deploy
+            - --schema
+            - apps/integration-ingestion-service/prisma/schema.prisma
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: INTEGRATION_DATABASE_URL
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: evidence-migrate
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: evidence-migrate
+    app.kubernetes.io/part-of: cdep
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: gitlab-registry
+      containers:
+        - name: migrate
+          image: registry.gitlab.com/reboot4443731/cdep/evidence-service:latest
+          imagePullPolicy: Always
+          command:
+            - ./node_modules/.bin/prisma
+            - migrate
+            - deploy
+            - --schema
+            - apps/evidence-service/prisma/schema.prisma
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: EVIDENCE_DATABASE_URL
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: workflow-migrate
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: workflow-migrate
+    app.kubernetes.io/part-of: cdep
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: gitlab-registry
+      containers:
+        - name: migrate
+          image: registry.gitlab.com/reboot4443731/cdep/validation-workflow-service:latest
+          imagePullPolicy: Always
+          command:
+            - ./node_modules/.bin/prisma
+            - migrate
+            - deploy
+            - --schema
+            - apps/validation-workflow-service/prisma/schema.prisma
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: WORKFLOW_DATABASE_URL
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ai-migrate
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: ai-migrate
+    app.kubernetes.io/part-of: cdep
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: gitlab-registry
+      containers:
+        - name: migrate
+          image: registry.gitlab.com/reboot4443731/cdep/ai-assessment-service:latest
+          imagePullPolicy: Always
+          command:
+            - ./node_modules/.bin/prisma
+            - migrate
+            - deploy
+            - --schema
+            - apps/ai-assessment-service/prisma/schema.prisma
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: AI_DATABASE_URL
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ledger-migrate
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: ledger-migrate
+    app.kubernetes.io/part-of: cdep
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: gitlab-registry
+      containers:
+        - name: migrate
+          image: registry.gitlab.com/reboot4443731/cdep/ledger-service:latest
+          imagePullPolicy: Always
+          command:
+            - ./node_modules/.bin/prisma
+            - migrate
+            - deploy
+            - --schema
+            - apps/ledger-service/prisma/schema.prisma
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: LEDGER_DATABASE_URL

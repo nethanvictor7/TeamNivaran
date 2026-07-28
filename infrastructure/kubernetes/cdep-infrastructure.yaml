@@ -1,0 +1,455 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: garage-config
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: garage
+    app.kubernetes.io/part-of: cdep
+data:
+  garage.toml: |
+    metadata_dir = "/var/lib/garage/meta"
+    data_dir = "/var/lib/garage/data"
+    db_engine = "sqlite"
+    replication_factor = 1
+    rpc_bind_addr = "[::]:3901"
+    rpc_public_addr = "127.0.0.1:3901"
+
+    [s3_api]
+    s3_region = "cdep-gke"
+    api_bind_addr = "[::]:3900"
+    root_domain = ".s3.cdep.internal"
+
+    [s3_web]
+    bind_addr = "[::]:3902"
+    root_domain = ".web.cdep.internal"
+    index = "index.html"
+
+    [admin]
+    api_bind_addr = "[::]:3903"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kafka-data
+  namespace: cdep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/part-of: cdep
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kafka
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kafka
+        app.kubernetes.io/part-of: cdep
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+      initContainers:
+        - name: prepare-kafka-storage
+          image: busybox:1.37
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -ec
+            - mkdir -p /var/lib/kafka/storage/kraft-logs
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/storage
+      containers:
+        - name: kafka
+          image: apache/kafka:4.3.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: KAFKA_NODE_ID
+              value: "1"
+            - name: KAFKA_PROCESS_ROLES
+              value: broker,controller
+            - name: CLUSTER_ID
+              value: 4L6g3nShT-eMCtK--X86sw
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: 1@localhost:9093
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT
+            - name: KAFKA_LISTENERS
+              value: CONTROLLER://:9093,INTERNAL://:9092
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: INTERNAL://kafka:9092
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: INTERNAL
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: CONTROLLER
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "1"
+            - name: KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR
+              value: "1"
+            - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+              value: "0"
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
+            - name: KAFKA_LOG_DIRS
+              value: /var/lib/kafka/storage/kraft-logs
+          ports:
+            - name: kafka
+              containerPort: 9092
+            - name: controller
+              containerPort: 9093
+          startupProbe:
+            tcpSocket:
+              port: kafka
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: kafka
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            tcpSocket:
+              port: kafka
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 250m
+              memory: 768Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/storage
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: kafka-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: cdep
+spec:
+  selector:
+    app.kubernetes.io/name: kafka
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: kafka
+    - name: controller
+      port: 9093
+      targetPort: controller
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-topic-bootstrap
+  namespace: cdep
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kafka-topic-bootstrap
+        app.kubernetes.io/part-of: cdep
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      initContainers:
+        - name: wait-for-kafka
+          image: apache/kafka:4.3.1
+          command:
+            - bash
+            - -ec
+            - >-
+              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server
+              kafka:9092 --list; do sleep 5; done
+      containers:
+        - name: create-topics
+          image: apache/kafka:4.3.1
+          command:
+            - bash
+            - -ec
+            - >-
+              for topic in cdep.case.v1 cdep.integration.lifecycle.v1
+              cdep.integration.trigger.v1 cdep.evidence.events.v1
+              cdep.evidence.dlt.v1 cdep.workflow.events.v1 cdep.workflow.dlt.v1
+              cdep.ai.assessment.v1 cdep.ai.governance.v1 cdep.ai.dlt.v1
+              cdep.ledger.proof.v1 cdep.ledger.verification.v1
+              cdep.ledger.dlt.v1; do
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092
+              --create --if-not-exists --partitions 1 --replication-factor 1
+              --topic "$topic"; done
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: garage-meta
+  namespace: cdep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: garage-data
+  namespace: cdep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: garage
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: garage
+    app.kubernetes.io/part-of: cdep
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: garage
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: garage
+        app.kubernetes.io/part-of: cdep
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: garage
+          image: dxflrs/garage:v2.3.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - /garage
+            - server
+            - --single-node
+            - --default-bucket
+          env:
+            - name: GARAGE_RPC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: GARAGE_RPC_SECRET
+            - name: GARAGE_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: GARAGE_ADMIN_TOKEN
+            - name: GARAGE_DEFAULT_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: OBJECT_STORAGE_ACCESS_KEY
+            - name: GARAGE_DEFAULT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-runtime-secrets
+                  key: OBJECT_STORAGE_SECRET_KEY
+            - name: GARAGE_DEFAULT_BUCKET
+              value: cdep-evidence-quarantine
+          ports:
+            - name: s3
+              containerPort: 3900
+            - name: rpc
+              containerPort: 3901
+            - name: admin
+              containerPort: 3903
+          readinessProbe:
+            exec: null
+            httpGet:
+              path: /health
+              port: admin
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: s3
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/garage.toml
+              subPath: garage.toml
+              readOnly: true
+            - name: meta
+              mountPath: /var/lib/garage/meta
+            - name: data
+              mountPath: /var/lib/garage/data
+      volumes:
+        - name: config
+          configMap:
+            name: garage-config
+        - name: meta
+          persistentVolumeClaim:
+            claimName: garage-meta
+        - name: data
+          persistentVolumeClaim:
+            claimName: garage-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage
+  namespace: cdep
+spec:
+  selector:
+    app.kubernetes.io/name: garage
+  ports:
+    - name: s3
+      port: 3900
+      targetPort: s3
+    - name: rpc
+      port: 3901
+      targetPort: rpc
+    - name: admin
+      port: 3903
+      targetPort: admin
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: clamav-data
+  namespace: cdep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clamav
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: clamav
+    app.kubernetes.io/part-of: cdep
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: clamav
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: clamav
+        app.kubernetes.io/part-of: cdep
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: clamav
+          image: clamav/clamav:1.5.3
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: clamd
+              containerPort: 3310
+          readinessProbe:
+            tcpSocket:
+              port: clamd
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 20
+          livenessProbe:
+            tcpSocket:
+              port: clamd
+            initialDelaySeconds: 120
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 3Gi
+          volumeMounts:
+            - name: definitions
+              mountPath: /var/lib/clamav
+      volumes:
+        - name: definitions
+          persistentVolumeClaim:
+            claimName: clamav-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clamav
+  namespace: cdep
+spec:
+  selector:
+    app.kubernetes.io/name: clamav
+  ports:
+    - name: clamd
+      port: 3310
+      targetPort: clamd

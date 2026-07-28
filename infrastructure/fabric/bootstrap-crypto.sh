@@ -16,8 +16,10 @@ stable_key=crypto-config/peerOrganizations/cdep.example.com/users/Admin@cdep.exa
 if [ "$key" != "$stable_key" ]; then
   cp "$key" "$stable_key"
 fi
-chgrp 10007 "$stable_key"
-chmod 0640 "$stable_key"
+if [[ "${FABRIC_SKIP_STABLE_KEY_PERMISSION_CHANGE:-false}" != "true" ]]; then
+  chgrp 10007 "$stable_key"
+  chmod 0640 "$stable_key"
+fi
 
 configtxgen -profile CDEPChannel \
   -channelID cdep-proof-channel \
