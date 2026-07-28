@@ -1,0 +1,53 @@
+{
+  "name": "cdep-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Credit Decision Evidence Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build:packages && npm run build:apps",
+    "build:packages": "npm run build --workspace @cdep/config && npm run build --workspace @cdep/contracts && npm run build --workspace @cdep/errors",
+    "build:apps": "npm run build --workspace @cdep/identity-access-service && npm run build --workspace @cdep/case-service && npm run build --workspace @cdep/integration-ingestion-service && npm run build --workspace @cdep/evidence-service && npm run build --workspace @cdep/validation-workflow-service && npm run build --workspace @cdep/ai-assessment-service && npm run build --workspace @cdep/ledger-service && npm run build --workspace @cdep/api-gateway && npm run build --workspace @cdep/web-portal",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run build:packages && npm run typecheck --workspace @cdep/identity-access-service && npm run typecheck --workspace @cdep/case-service && npm run typecheck --workspace @cdep/integration-ingestion-service && npm run typecheck --workspace @cdep/evidence-service && npm run typecheck --workspace @cdep/validation-workflow-service && npm run typecheck --workspace @cdep/ai-assessment-service && npm run typecheck --workspace @cdep/ledger-service && npm run typecheck --workspace @cdep/api-gateway && npm run typecheck --workspace @cdep/web-portal",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "infra:up": "docker compose --profile infrastructure up -d",
+    "infra:down": "docker compose --profile infrastructure down",
+    "local:up": "docker compose --profile local up -d --build",
+    "local:down": "docker compose --profile local down",
+    "db:migrate": "npm run prisma:migrate --workspace @cdep/identity-access-service",
+    "db:seed": "npm run prisma:seed --workspace @cdep/identity-access-service",
+    "case:db:migrate": "npm run prisma:migrate --workspace @cdep/case-service",
+    "integration:db:migrate": "npm run prisma:deploy --workspace @cdep/integration-ingestion-service",
+    "evidence:db:migrate": "npm run prisma:deploy --workspace @cdep/evidence-service",
+    "workflow:db:migrate": "npm run prisma:deploy --workspace @cdep/validation-workflow-service",
+    "ai:db:migrate": "npm run prisma:deploy --workspace @cdep/ai-assessment-service",
+    "ledger:db:migrate": "npm run prisma:deploy --workspace @cdep/ledger-service",
+    "validate:phase4": "node scripts/validate-phase4.mjs",
+    "validate:phase5": "node scripts/validate-phase5.mjs",
+    "validate:phase6": "node scripts/validate-phase6.mjs",
+    "validate:phase6.1": "node scripts/validate-phase6.1-v2.mjs",
+    "validate:phase6.1:api": "node scripts/validate-phase6.1.mjs"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=11.0.0"
+  },
+  "dependencies": {
+    "find-my-way": "9.7.0"
+  },
+  "overrides": {
+    "find-my-way": "9.7.0",
+    "@nestjs/platform-fastify@11.1.28": {
+      "find-my-way": "npm:find-my-way@9.7.0"
+    }
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2"
+  }
+}

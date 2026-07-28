@@ -1,0 +1,226 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/@cdep/ledger-prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProofKind {
+  EVIDENCE
+  DECISION
+}
+
+enum ProofRequestState {
+  PENDING
+  SUBMITTING
+  SUBMITTED
+  CONFIRMED
+  FAILED_RETRYABLE
+  FAILED_PERMANENT
+  CONFLICT
+}
+
+model LedgerProviderConfiguration {
+  id                    String   @id @default(uuid()) @db.Uuid
+  providerType          String   @map("provider_type") @db.VarChar(30)
+  networkReference      String   @map("network_reference") @db.VarChar(160)
+  contractReference     String   @map("contract_reference") @db.VarChar(160)
+  metadataSchemaVersion String   @default("1.0") @map("metadata_schema_version") @db.VarChar(20)
+  enabled               Boolean  @default(true)
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([providerType, networkReference, contractReference])
+  @@map("ledger_provider_configurations")
+}
+
+model LedgerProviderBinding {
+  id                            String   @id @default(uuid()) @db.Uuid
+  proofRequestId                String   @unique @map("proof_request_id") @db.Uuid
+  providerType                  String   @map("provider_type") @db.VarChar(30)
+  providerTransactionId         String?  @map("provider_transaction_id") @db.VarChar(200)
+  providerProofReference        String?  @map("provider_proof_reference") @db.VarChar(200)
+  providerContractReference     String   @map("provider_contract_reference") @db.VarChar(160)
+  providerNetworkReference      String   @map("provider_network_reference") @db.VarChar(160)
+  providerMetadataSchemaVersion String   @default("1.0") @map("provider_metadata_schema_version") @db.VarChar(20)
+  providerMetadata              Json     @default("{}") @map("provider_metadata_json")
+  createdAt                     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                     DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  request                       ProofRequest @relation(fields: [proofRequestId], references: [id], onDelete: Restrict)
+
+  @@index([providerType, providerTransactionId])
+  @@map("ledger_provider_bindings")
+}
+
+model ProofRequest {
+  id                String            @id @default(uuid()) @db.Uuid
+  proofId           String            @unique @map("proof_id") @db.Uuid
+  organizationId    String            @map("organization_id") @db.Uuid
+  caseId            String            @map("case_id") @db.Uuid
+  kind              ProofKind
+  evidenceAssetId   String?           @map("evidence_asset_id") @db.Uuid
+  evidenceVersionId String?           @map("evidence_version_id") @db.Uuid
+  decisionId        String?           @map("decision_id") @db.Uuid
+  canonicalPayload  Json              @map("canonical_payload_json")
+  canonicalSha256   String            @map("canonical_sha256") @db.Char(64)
+  providerType      String            @map("provider_type") @db.VarChar(30)
+  state             ProofRequestState @default(PENDING)
+  attempts          Int               @default(0)
+  nextAttemptAt     DateTime?         @map("next_attempt_at") @db.Timestamptz
+  leaseOwner        String?           @map("lease_owner") @db.VarChar(160)
+  leaseExpiresAt    DateTime?         @map("lease_expires_at") @db.Timestamptz
+  safeErrorCode     String?           @map("safe_error_code") @db.VarChar(100)
+  requestedBy       String            @map("requested_by") @db.Uuid
+  requestedAt       DateTime          @default(now()) @map("requested_at") @db.Timestamptz
+  submittedAt       DateTime?         @map("submitted_at") @db.Timestamptz
+  confirmedAt       DateTime?         @map("confirmed_at") @db.Timestamptz
+  rowVersion        Int               @default(1) @map("row_version")
+  correlationId     String            @map("correlation_id") @db.Uuid
+  binding           LedgerProviderBinding?
+  evidenceRecord    EvidenceProofRecord?
+  decisionRecord    DecisionProofRecord?
+  transactions      LedgerTransaction[]
+  verifications     VerificationAttempt[]
+
+  @@unique([organizationId, evidenceAssetId, evidenceVersionId, kind])
+  @@unique([organizationId, caseId, decisionId, kind])
+  @@index([state, nextAttemptAt, requestedAt])
+  @@index([organizationId, caseId, requestedAt])
+  @@map("proof_requests")
+}
+
+model EvidenceProofRecord {
+  id                    String   @id @default(uuid()) @db.Uuid
+  proofRequestId        String   @unique @map("proof_request_id") @db.Uuid
+  proofId               String   @unique @map("proof_id") @db.Uuid
+  organizationId        String   @map("organization_id") @db.Uuid
+  caseId                String   @map("case_id") @db.Uuid
+  evidenceAssetId       String   @map("evidence_asset_id") @db.Uuid
+  evidenceVersionId     String   @map("evidence_version_id") @db.Uuid
+  contentSha256         String   @map("content_sha256") @db.Char(64)
+  metadataSha256        String   @map("metadata_sha256") @db.Char(64)
+  previousProofId       String?  @map("previous_proof_id") @db.Uuid
+  schemaVersion         String   @map("schema_version") @db.VarChar(20)
+  anchoredAt            DateTime? @map("anchored_at") @db.Timestamptz
+  request               ProofRequest @relation(fields: [proofRequestId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, evidenceAssetId, evidenceVersionId])
+  @@map("evidence_proof_records")
+}
+
+model DecisionProofRecord {
+  id                     String   @id @default(uuid()) @db.Uuid
+  proofRequestId         String   @unique @map("proof_request_id") @db.Uuid
+  proofId                String   @unique @map("proof_id") @db.Uuid
+  organizationId         String   @map("organization_id") @db.Uuid
+  caseId                 String   @map("case_id") @db.Uuid
+  workflowInstanceId     String   @map("workflow_instance_id") @db.Uuid
+  decisionId             String   @map("decision_id") @db.Uuid
+  decisionOutcomeCode    String   @map("decision_outcome_code") @db.VarChar(30)
+  evidenceManifestSha256 String   @map("evidence_manifest_sha256") @db.Char(64)
+  recommendationSha256   String   @map("recommendation_sha256") @db.Char(64)
+  decisionRecordSha256   String   @map("decision_record_sha256") @db.Char(64)
+  schemaVersion          String   @map("schema_version") @db.VarChar(20)
+  anchoredAt             DateTime? @map("anchored_at") @db.Timestamptz
+  request                ProofRequest @relation(fields: [proofRequestId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, caseId, decisionId])
+  @@map("decision_proof_records")
+}
+
+model LedgerTransaction {
+  id                    String   @id @default(uuid()) @db.Uuid
+  proofRequestId        String   @map("proof_request_id") @db.Uuid
+  attemptNumber         Int      @map("attempt_number")
+  providerType          String   @map("provider_type") @db.VarChar(30)
+  providerTransactionId String?  @map("provider_transaction_id") @db.VarChar(200)
+  normalizedState       String   @map("normalized_state") @db.VarChar(40)
+  retryable             Boolean  @default(false)
+  safeErrorCode         String?  @map("safe_error_code") @db.VarChar(100)
+  submittedAt           DateTime? @map("submitted_at") @db.Timestamptz
+  finalizedAt           DateTime? @map("finalized_at") @db.Timestamptz
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+  request               ProofRequest @relation(fields: [proofRequestId], references: [id], onDelete: Restrict)
+
+  @@unique([proofRequestId, attemptNumber])
+  @@index([providerType, providerTransactionId])
+  @@map("ledger_transactions")
+}
+
+model LedgerReconciliationRun {
+  id             String   @id @default(uuid()) @db.Uuid
+  requestedBy    String   @map("requested_by") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  status         String   @db.VarChar(30)
+  inspected      Int      @default(0)
+  confirmed      Int      @default(0)
+  failed         Int      @default(0)
+  startedAt      DateTime @default(now()) @map("started_at") @db.Timestamptz
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz
+
+  @@map("ledger_reconciliation_runs")
+}
+
+model VerificationAttempt {
+  id                    String   @id @default(uuid()) @db.Uuid
+  proofRequestId        String   @map("proof_request_id") @db.Uuid
+  organizationId        String   @map("organization_id") @db.Uuid
+  requestedBy           String   @map("requested_by") @db.Uuid
+  offLedgerHashMatch    Boolean  @map("off_ledger_hash_match")
+  ledgerProofConfirmed  Boolean  @map("ledger_proof_confirmed")
+  ledgerHashMatch       Boolean  @map("ledger_hash_match")
+  providerState         String   @map("provider_state") @db.VarChar(40)
+  safeErrorCode         String?  @map("safe_error_code") @db.VarChar(100)
+  verifiedAt            DateTime @default(now()) @map("verified_at") @db.Timestamptz
+  request               ProofRequest @relation(fields: [proofRequestId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, verifiedAt])
+  @@map("verification_attempts")
+}
+
+model IdempotencyRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  actorId        String   @map("actor_id") @db.Uuid
+  route          String   @db.VarChar(200)
+  key            String   @db.VarChar(200)
+  requestHash    String   @map("request_hash") @db.Char(64)
+  responseBody   Json     @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([organizationId, actorId, route, key])
+  @@map("idempotency_records")
+}
+
+model OutboxEvent {
+  id               String   @id @default(uuid()) @db.Uuid
+  aggregateType    String   @map("aggregate_type") @db.VarChar(80)
+  aggregateId      String   @map("aggregate_id") @db.Uuid
+  aggregateVersion Int      @map("aggregate_version")
+  eventType        String   @map("event_type") @db.VarChar(160)
+  eventVersion     String   @map("event_version") @db.VarChar(20)
+  organizationId   String   @map("organization_id") @db.Uuid
+  correlationId    String   @map("correlation_id") @db.Uuid
+  causationId      String?  @map("causation_id") @db.Uuid
+  actorId          String   @map("actor_id") @db.VarChar(120)
+  payload          Json
+  occurredAt       DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+  publishedAt      DateTime? @map("published_at") @db.Timestamptz
+  attempts         Int      @default(0)
+  nextAttemptAt    DateTime? @map("next_attempt_at") @db.Timestamptz
+
+  @@index([publishedAt, nextAttemptAt, occurredAt])
+  @@map("outbox_events")
+}
+
+model InboxEvent {
+  eventId       String   @id @map("event_id") @db.Uuid
+  eventType     String   @map("event_type") @db.VarChar(160)
+  payloadSha256 String   @map("payload_sha256") @db.Char(64)
+  processedAt   DateTime @default(now()) @map("processed_at") @db.Timestamptz
+
+  @@map("inbox_events")
+}

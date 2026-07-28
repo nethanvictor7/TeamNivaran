@@ -1,0 +1,383 @@
+openapi: 3.1.0
+info:
+  title: CDEP Phase 2B Integration API
+  version: 2.0.0
+  description: Administration, webhook capture, SQL polling operations, and journey APIs.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/integration/hooks/{connectorKey}:
+    post:
+      summary: Capture an opaque webhook JSON object or array
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ConnectorKey"
+        - name: x-cdep-webhook-key
+          in: header
+          required: true
+          schema: { type: string, minLength: 16 }
+        - name: x-source-event-id
+          in: header
+          required: false
+          schema: { type: string, maxLength: 300 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - { type: object, additionalProperties: true }
+                - { type: array, items: {} }
+      responses:
+        "202":
+          description: Captured, including an identical idempotent duplicate
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WebhookReceipt" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "413": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+  /api/v1/integration/sources:
+    get:
+      summary: List source systems
+      responses: { "200": { description: Source systems } }
+    post:
+      summary: Create a source system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name]
+              properties:
+                code: { type: string }
+                name: { type: string }
+                description: { type: string }
+      responses:
+        {
+          "201": { description: Created },
+          "400": { $ref: "#/components/responses/Problem" },
+        }
+  /api/v1/integration/sources/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      summary: Get a source system
+      responses:
+        {
+          "200": { description: Source system },
+          "404": { $ref: "#/components/responses/Problem" },
+        }
+    patch:
+      summary: Update a draft source system using its version
+      responses:
+        {
+          "200": { description: Updated },
+          "409": { $ref: "#/components/responses/Problem" },
+        }
+  /api/v1/integration/sources/{id}/activate:
+    post:
+      summary: Activate a source system
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "201": { description: Activated } }
+  /api/v1/integration/sources/{id}/suspend:
+    post:
+      summary: Suspend a source system
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "201": { description: Suspended } }
+  /api/v1/integration/sources/{sourceId}/connectors:
+    parameters:
+      - name: sourceId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: List connectors for a source
+      responses: { "200": { description: Connectors } }
+    post:
+      summary: Create a webhook or SQL polling connector
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateConnector" }
+      responses:
+        {
+          "201": { description: Created },
+          "400": { $ref: "#/components/responses/Problem" },
+        }
+  /api/v1/integration/connectors/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      summary: Get redacted connector configuration
+      responses:
+        {
+          "200": { description: Connector },
+          "404": { $ref: "#/components/responses/Problem" },
+        }
+    patch:
+      summary: Update a connector using its version
+      responses:
+        {
+          "200": { description: Updated },
+          "409": { $ref: "#/components/responses/Problem" },
+        }
+  /api/v1/integration/connectors/{id}/credentials:
+    put:
+      summary: Set or rotate the write-only connector credential
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                { value: { type: string, minLength: 16, writeOnly: true } }
+      responses: { "200": { description: Rotation metadata only } }
+  /api/v1/integration/connectors/{id}/test:
+    post:
+      summary: Test connector credentials and read-only connectivity
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "201": { description: Test result } }
+  /api/v1/integration/connectors/{id}/activate:
+    post:
+      summary: Activate a connector
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "201": { description: Activated } }
+  /api/v1/integration/connectors/{id}/pause:
+    post:
+      summary: Pause a connector
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "201": { description: Paused } }
+  /api/v1/integration/connectors/{id}/run:
+    post:
+      summary: Run a SQL polling connector now
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        {
+          "201": { description: Ingestion run },
+          "409": { $ref: "#/components/responses/Problem" },
+        }
+  /api/v1/integration/connectors/{id}/extraction-rules:
+    get:
+      summary: Get optional field extraction rules
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "200": { description: Rules } }
+    put:
+      summary: Replace optional allowlisted JSONPath extraction rules
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "200": { description: Rules } }
+  /api/v1/integration/connectors/{id}/test-extraction:
+    post:
+      summary: Test extraction against an optional configuration-time sample
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "201": { description: Extracted fields and errors } }
+  /api/v1/integration/connectors/{id}/correlation-rules:
+    get:
+      summary: Get the deterministic correlation rule
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "200": { description: Rule } }
+    put:
+      summary: Publish a business or external reference equality rule
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "200": { description: Published rule version } }
+  /api/v1/integration/triggers:
+    get:
+      summary: List tenant-scoped source triggers without raw payloads
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - {
+            name: connectorId,
+            in: query,
+            schema: { type: string, format: uuid },
+          }
+        - { name: limit, in: query, schema: { type: integer, maximum: 200 } }
+      responses: { "200": { description: Triggers } }
+  /api/v1/integration/triggers/{id}:
+    get:
+      summary: Get source trigger metadata without its raw payload
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        {
+          "200": { description: Trigger },
+          "404": { $ref: "#/components/responses/Problem" },
+        }
+  /api/v1/integration/triggers/{id}/payload:
+    get:
+      summary: Retrieve a reason-gated raw payload and create an audit event
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: x-cdep-access-reason
+          in: header
+          required: true
+          schema: { type: string, minLength: 3 }
+      responses:
+        {
+          "200": { description: Raw payload },
+          "403": { $ref: "#/components/responses/Problem" },
+        }
+  /api/v1/integration/triggers/{id}/replay:
+    post:
+      summary: Replay a stored source trigger
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses: { "201": { description: Replay request } }
+  /api/v1/integration/triggers/{id}/resolve-case:
+    post:
+      summary: Manually resolve an unmatched or ambiguous trigger
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "201": { description: Resolved trigger } }
+  /api/v1/integration/runs:
+    get:
+      summary: List SQL ingestion runs and checkpoints
+      parameters:
+        - {
+            name: connectorId,
+            in: query,
+            schema: { type: string, format: uuid },
+          }
+      responses: { "200": { description: Runs } }
+  /api/v1/integration/runs/{id}:
+    get:
+      summary: Get an SQL ingestion run
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        {
+          "200": { description: Run },
+          "404": { $ref: "#/components/responses/Problem" },
+        }
+  /api/v1/integration/cases/{caseId}/journey:
+    get:
+      summary: List source trigger journey events for a case
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses: { "200": { description: Journey events } }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ConnectorKey:
+      name: connectorKey
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, maxLength: 200 }
+  responses:
+    Problem:
+      description: Correlated API problem
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+  schemas:
+    Problem:
+      type: object
+      required:
+        [type, title, status, code, detail, instance, correlationId, timestamp]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        code: { type: string }
+        detail: { type: string }
+        instance: { type: string }
+        correlationId: { type: string, format: uuid }
+        timestamp: { type: string, format: date-time }
+    WebhookReceipt:
+      type: object
+      required: [receiptId, status, correlationId, receivedAt]
+      properties:
+        receiptId: { type: string, format: uuid }
+        status: { const: RECEIVED }
+        correlationId: { type: string, format: uuid }
+        receivedAt: { type: string, format: date-time }
+    CreateConnector:
+      oneOf:
+        - type: object
+          required: [name, type, triggerType, configuration]
+          properties:
+            name: { type: string }
+            type: { const: WEBHOOK }
+            triggerType:
+              { type: string, pattern: "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$" }
+            configuration:
+              type: object
+              properties:
+                {
+                  rateLimitPerMinute:
+                    { type: integer, minimum: 1, maximum: 10000 },
+                }
+              additionalProperties: false
+        - type: object
+          required: [name, type, triggerType, configuration]
+          properties:
+            name: { type: string }
+            type: { const: SQL_POLL }
+            triggerType: { type: string }
+            configuration:
+              $ref: "#/components/schemas/PostgresPollingConfiguration"
+    PostgresPollingConfiguration:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          host,
+          database,
+          schema,
+          tableOrView,
+          selectedColumns,
+          watermarkColumn,
+          watermarkType,
+          tieBreakerColumn,
+          tieBreakerType,
+          sourceRecordIdColumn,
+          pollIntervalSeconds,
+          batchSize,
+          statementTimeoutMs,
+          initialLookbackMinutes,
+        ]
+      properties:
+        engine: { const: POSTGRESQL }
+        host: { type: string }
+        port: { type: integer, minimum: 1, maximum: 65535, default: 5432 }
+        database: { type: string }
+        sslMode: { enum: [DISABLE, REQUIRE] }
+        schema: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_]{0,62}$" }
+        tableOrView: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_]{0,62}$" }
+        selectedColumns:
+          type: array
+          minItems: 1
+          items: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_]{0,62}$" }
+        watermarkColumn: { type: string }
+        watermarkType: { enum: [TIMESTAMP, BIGINT] }
+        tieBreakerColumn: { type: string }
+        tieBreakerType: { enum: [UUID, STRING, BIGINT] }
+        sourceRecordIdColumn: { type: string }
+        occurredAtColumn: { type: [string, "null"] }
+        pollIntervalSeconds: { type: integer, minimum: 5 }
+        batchSize: { type: integer, minimum: 1 }
+        statementTimeoutMs: { type: integer, minimum: 100 }
+        initialLookbackMinutes: { type: integer, minimum: 1 }

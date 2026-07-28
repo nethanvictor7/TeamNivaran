@@ -1,0 +1,1039 @@
+name: cdep
+
+services:
+  integration-demo-postgres:
+    image: postgres:17.10-bookworm
+    profiles: [integration-demo]
+    environment:
+      POSTGRES_USER: demo_admin
+      POSTGRES_PASSWORD: cdep-demo-admin-2026
+      POSTGRES_DB: cdep_source_demo
+      DEMO_SOURCE_READER: ${DEMO_SOURCE_READER:?Set DEMO_SOURCE_READER in .env}
+      DEMO_SOURCE_PASSWORD: ${DEMO_SOURCE_PASSWORD:?Set DEMO_SOURCE_PASSWORD in .env}
+    ports:
+      - "55432:5432"
+    volumes:
+      - integration-demo-data:/var/lib/postgresql/data
+      - ./infrastructure/docker/integration-demo/00-seed.sh:/docker-entrypoint-initdb.d/00-seed.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo_admin -d cdep_source_demo"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [cdep-network]
+
+  postgres:
+    image: postgres:17.10-bookworm
+    profiles: [infrastructure, local]
+    environment:
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-cdep_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Set POSTGRES_SUPERUSER_PASSWORD in .env}
+      IDENTITY_DB_USER: ${IDENTITY_DB_USER:-cdep_identity_app}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}
+      IDENTITY_DB_NAME: ${IDENTITY_DB_NAME:-cdep_identity}
+      CASE_DB_USER: ${CASE_DB_USER:-cdep_case_app}
+      CASE_DB_PASSWORD: ${CASE_DB_PASSWORD:?Set CASE_DB_PASSWORD in .env}
+      CASE_DB_NAME: ${CASE_DB_NAME:-cdep_case}
+      INTEGRATION_DB_USER: ${INTEGRATION_DB_USER:-cdep_integration_app}
+      INTEGRATION_DB_PASSWORD: ${INTEGRATION_DB_PASSWORD:?Set INTEGRATION_DB_PASSWORD in .env}
+      INTEGRATION_DB_NAME: ${INTEGRATION_DB_NAME:-cdep_integration}
+      EVIDENCE_DB_USER: ${EVIDENCE_DB_USER:-cdep_evidence_app}
+      EVIDENCE_DB_PASSWORD: ${EVIDENCE_DB_PASSWORD:?Set EVIDENCE_DB_PASSWORD in .env}
+      EVIDENCE_DB_NAME: ${EVIDENCE_DB_NAME:-cdep_evidence}
+      WORKFLOW_DB_USER: ${WORKFLOW_DB_USER:-cdep_workflow_app}
+      WORKFLOW_DB_PASSWORD: ${WORKFLOW_DB_PASSWORD:?Set WORKFLOW_DB_PASSWORD in .env}
+      WORKFLOW_DB_NAME: ${WORKFLOW_DB_NAME:-cdep_workflow}
+      AI_DB_USER: ${AI_DB_USER:-cdep_ai_app}
+      AI_DB_PASSWORD: ${AI_DB_PASSWORD:?Set AI_DB_PASSWORD in .env}
+      AI_DB_NAME: ${AI_DB_NAME:-cdep_ai}
+      LEDGER_DB_USER: ${LEDGER_DB_USER:-cdep_ledger_app}
+      LEDGER_DB_PASSWORD: ${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}
+      LEDGER_DB_NAME: ${LEDGER_DB_NAME:-cdep_ledger}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/00-create-service-databases.sh:/docker-entrypoint-initdb.d/00-create-service-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [cdep-network]
+
+  service-database-bootstrap:
+    image: postgres:17.10-bookworm
+    profiles: [local]
+    command: ["bash", "/bootstrap.sh"]
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-cdep_admin}
+      PGPASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Set POSTGRES_SUPERUSER_PASSWORD in .env}
+      IDENTITY_DB_USER: ${IDENTITY_DB_USER:-cdep_identity_app}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}
+      IDENTITY_DB_NAME: ${IDENTITY_DB_NAME:-cdep_identity}
+      CASE_DB_USER: ${CASE_DB_USER:-cdep_case_app}
+      CASE_DB_PASSWORD: ${CASE_DB_PASSWORD:?Set CASE_DB_PASSWORD in .env}
+      CASE_DB_NAME: ${CASE_DB_NAME:-cdep_case}
+      INTEGRATION_DB_USER: ${INTEGRATION_DB_USER:-cdep_integration_app}
+      INTEGRATION_DB_PASSWORD: ${INTEGRATION_DB_PASSWORD:?Set INTEGRATION_DB_PASSWORD in .env}
+      INTEGRATION_DB_NAME: ${INTEGRATION_DB_NAME:-cdep_integration}
+      EVIDENCE_DB_USER: ${EVIDENCE_DB_USER:-cdep_evidence_app}
+      EVIDENCE_DB_PASSWORD: ${EVIDENCE_DB_PASSWORD:?Set EVIDENCE_DB_PASSWORD in .env}
+      EVIDENCE_DB_NAME: ${EVIDENCE_DB_NAME:-cdep_evidence}
+      WORKFLOW_DB_USER: ${WORKFLOW_DB_USER:-cdep_workflow_app}
+      WORKFLOW_DB_PASSWORD: ${WORKFLOW_DB_PASSWORD:?Set WORKFLOW_DB_PASSWORD in .env}
+      WORKFLOW_DB_NAME: ${WORKFLOW_DB_NAME:-cdep_workflow}
+      AI_DB_USER: ${AI_DB_USER:-cdep_ai_app}
+      AI_DB_PASSWORD: ${AI_DB_PASSWORD:?Set AI_DB_PASSWORD in .env}
+      AI_DB_NAME: ${AI_DB_NAME:-cdep_ai}
+      LEDGER_DB_USER: ${LEDGER_DB_USER:-cdep_ledger_app}
+      LEDGER_DB_PASSWORD: ${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}
+      LEDGER_DB_NAME: ${LEDGER_DB_NAME:-cdep_ledger}
+    volumes:
+      - ./infrastructure/docker/postgres/00-create-service-databases.sh:/bootstrap.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [cdep-network]
+
+  kafka:
+    image: apache/kafka:4.3.1
+    profiles: [infrastructure, local]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: CONTROLLER://:9093,INTERNAL://:9092,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "29092:29092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks: [cdep-network]
+
+  kafka-topic-bootstrap:
+    image: apache/kafka:4.3.1
+    profiles: [local]
+    command:
+      [
+        "bash",
+        "-ec",
+        'for topic in cdep.case.v1 cdep.integration.lifecycle.v1 cdep.integration.trigger.v1 cdep.evidence.events.v1 cdep.evidence.dlt.v1 cdep.workflow.events.v1 cdep.workflow.dlt.v1 cdep.ai.assessment.v1 cdep.ai.governance.v1 cdep.ai.dlt.v1 cdep.ledger.proof.v1 cdep.ledger.verification.v1 cdep.ledger.dlt.v1; do /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --partitions 1 --replication-factor 1 --topic "$$topic"; done',
+      ]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks: [cdep-network]
+
+  redis:
+    image: redis:8.8.0-alpine
+    profiles: [infrastructure, local]
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [cdep-network]
+
+  garage:
+    image: dxflrs/garage:v2.3.0
+    profiles: [infrastructure, local]
+    ports:
+      - "3900:3900"
+      - "3901:3901"
+      - "3903:3903"
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?Set GARAGE_RPC_SECRET in .env}
+      GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:?Set GARAGE_ADMIN_TOKEN in .env}
+      GARAGE_DEFAULT_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:?Set OBJECT_STORAGE_ACCESS_KEY in .env}
+      GARAGE_DEFAULT_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:?Set OBJECT_STORAGE_SECRET_KEY in .env}
+      GARAGE_DEFAULT_BUCKET: ${OBJECT_STORAGE_QUARANTINE_BUCKET:-cdep-evidence-quarantine}
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    volumes:
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+      - ./infrastructure/docker/garage.toml:/etc/garage.toml:ro
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [cdep-network]
+
+  clamav:
+    image: clamav/clamav:1.5.3
+    platform: linux/amd64
+    profiles: [infrastructure, local]
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav-data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "echo PING | nc 127.0.0.1 3310 | grep PONG"]
+      interval: 30s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    networks: [cdep-network]
+
+  identity-migrate:
+    build:
+      context: .
+      dockerfile: apps/identity-access-service/Dockerfile
+      target: build
+    profiles: [local]
+    command:
+      [
+        "npm",
+        "run",
+        "prisma:deploy",
+        "--workspace",
+        "@cdep/identity-access-service",
+      ]
+    environment:
+      DATABASE_URL: postgresql://${IDENTITY_DB_USER:-cdep_identity_app}:${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}@postgres:5432/${IDENTITY_DB_NAME:-cdep_identity}
+    depends_on:
+      service-database-bootstrap:
+        condition: service_completed_successfully
+    networks: [cdep-network]
+
+  identity-seed:
+    build:
+      context: .
+      dockerfile: apps/identity-access-service/Dockerfile
+      target: build
+    profiles: [local]
+    command:
+      [
+        "npm",
+        "run",
+        "prisma:seed",
+        "--workspace",
+        "@cdep/identity-access-service",
+      ]
+    environment:
+      DATABASE_URL: postgresql://${IDENTITY_DB_USER:-cdep_identity_app}:${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}@postgres:5432/${IDENTITY_DB_NAME:-cdep_identity}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@cdep.local}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?Set BOOTSTRAP_ADMIN_PASSWORD in .env}
+      BOOTSTRAP_ORGANIZATION_NAME: ${BOOTSTRAP_ORGANIZATION_NAME:-CDEP Local Bank}
+      BOOTSTRAP_REVIEWER_EMAIL: ${BOOTSTRAP_REVIEWER_EMAIL:-reviewer@cdep.local}
+      BOOTSTRAP_APPROVER_EMAIL: ${BOOTSTRAP_APPROVER_EMAIL:-approver@cdep.local}
+      BOOTSTRAP_AUDITOR_EMAIL: ${BOOTSTRAP_AUDITOR_EMAIL:-auditor@cdep.local}
+      BOOTSTRAP_OUTSIDER_EMAIL: ${BOOTSTRAP_OUTSIDER_EMAIL:-outsider@cdep.local}
+    depends_on:
+      identity-migrate:
+        condition: service_completed_successfully
+    networks: [cdep-network]
+
+  identity-access-service:
+    build:
+      context: .
+      dockerfile: apps/identity-access-service/Dockerfile
+    profiles: [local]
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://${IDENTITY_DB_USER:-cdep_identity_app}:${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}@postgres:5432/${IDENTITY_DB_NAME:-cdep_identity}
+      REDIS_URL: redis://redis:6379
+      JWT_ISSUER: ${JWT_ISSUER:-cdep-identity-access-service}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-cdep-api}
+      JWT_KEY_ID: ${JWT_KEY_ID:-cdep-local-2026-01}
+      JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS:-900}
+      JWT_REFRESH_TTL_SECONDS: ${JWT_REFRESH_TTL_SECONDS:-604800}
+      JWT_ALLOW_EPHEMERAL_KEYS: "true"
+      REFRESH_COOKIE_SECURE: "false"
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@cdep.local}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?Set BOOTSTRAP_ADMIN_PASSWORD in .env}
+      BOOTSTRAP_ORGANIZATION_NAME: ${BOOTSTRAP_ORGANIZATION_NAME:-CDEP Local Bank}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env}
+    depends_on:
+      identity-seed:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3001/health/ready').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 10s
+      timeout: 4s
+      retries: 15
+    networks: [cdep-network]
+
+  case-migrate:
+    build:
+      context: .
+      dockerfile: apps/case-service/Dockerfile
+      target: build
+    profiles: [local]
+    command:
+      ["npm", "run", "prisma:deploy", "--workspace", "@cdep/case-service"]
+    environment:
+      DATABASE_URL: postgresql://${CASE_DB_USER:-cdep_case_app}:${CASE_DB_PASSWORD:?Set CASE_DB_PASSWORD in .env}@postgres:5432/${CASE_DB_NAME:-cdep_case}
+    depends_on:
+      service-database-bootstrap:
+        condition: service_completed_successfully
+    networks: [cdep-network]
+
+  case-service:
+    build:
+      context: .
+      dockerfile: apps/case-service/Dockerfile
+    profiles: [local]
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgresql://${CASE_DB_USER:-cdep_case_app}:${CASE_DB_PASSWORD:?Set CASE_DB_PASSWORD in .env}@postgres:5432/${CASE_DB_NAME:-cdep_case}
+      JWT_JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
+      JWT_ISSUER: ${JWT_ISSUER:-cdep-identity-access-service}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-cdep-api}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_SECURITY_PROTOCOL: ${KAFKA_SECURITY_PROTOCOL:-PLAINTEXT}
+      KAFKA_SASL_MECHANISM: ${KAFKA_SASL_MECHANISM:-SCRAM-SHA-512}
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
+      OUTBOX_ENABLED: "true"
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env}
+    depends_on:
+      case-migrate:
+        condition: service_completed_successfully
+      identity-access-service:
+        condition: service_healthy
+      kafka-topic-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3002/health/ready').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 10s
+      timeout: 4s
+      retries: 15
+    ports:
+      - "3002:3002"
+    networks: [cdep-network]
+
+  integration-migrate:
+    build:
+      context: .
+      dockerfile: apps/integration-ingestion-service/Dockerfile
+      target: build
+    profiles: [local]
+    command:
+      [
+        "npm",
+        "run",
+        "prisma:deploy",
+        "--workspace",
+        "@cdep/integration-ingestion-service",
+      ]
+    environment:
+      DATABASE_URL: postgresql://${INTEGRATION_DB_USER:-cdep_integration_app}:${INTEGRATION_DB_PASSWORD:?Set INTEGRATION_DB_PASSWORD in .env}@postgres:5432/${INTEGRATION_DB_NAME:-cdep_integration}
+    depends_on:
+      service-database-bootstrap:
+        condition: service_completed_successfully
+    networks: [cdep-network]
+
+  integration-ingestion-service:
+    build:
+      context: .
+      dockerfile: apps/integration-ingestion-service/Dockerfile
+    profiles: [local]
+    environment:
+      PORT: 3003
+      DATABASE_URL: postgresql://${INTEGRATION_DB_USER:-cdep_integration_app}:${INTEGRATION_DB_PASSWORD:?Set INTEGRATION_DB_PASSWORD in .env}@postgres:5432/${INTEGRATION_DB_NAME:-cdep_integration}
+      INTEGRATION_DATABASE_URL: postgresql://${INTEGRATION_DB_USER:-cdep_integration_app}:${INTEGRATION_DB_PASSWORD:?Set INTEGRATION_DB_PASSWORD in .env}@postgres:5432/${INTEGRATION_DB_NAME:-cdep_integration}
+      JWT_JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
+      JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
+      JWT_ISSUER: ${JWT_ISSUER:-cdep-identity-access-service}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-cdep-api}
+      CASE_SERVICE_URL: http://case-service:3002
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_SECURITY_PROTOCOL: ${KAFKA_SECURITY_PROTOCOL:-PLAINTEXT}
+      KAFKA_SASL_MECHANISM: ${KAFKA_SASL_MECHANISM:-SCRAM-SHA-512}
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
+      CONNECTOR_SECRET_PROVIDER: ${CONNECTOR_SECRET_PROVIDER:-local}
+      CONNECTOR_CREDENTIAL_ENCRYPTION_KEY: ${CONNECTOR_CREDENTIAL_ENCRYPTION_KEY:?Set CONNECTOR_CREDENTIAL_ENCRYPTION_KEY}
+      CONNECTOR_CREDENTIAL_KEY_ID: ${CONNECTOR_CREDENTIAL_KEY_ID:-cdep-local-integration-01}
+      WEBHOOK_MAX_BODY_BYTES: 1048576
+      SQL_POLL_DEFAULT_BATCH_SIZE: ${SQL_POLL_DEFAULT_BATCH_SIZE:-100}
+      SQL_POLL_MAX_BATCH_SIZE: ${SQL_POLL_MAX_BATCH_SIZE:-1000}
+      SQL_POLL_MAX_INITIAL_LOOKBACK_MINUTES: ${SQL_POLL_MAX_INITIAL_LOOKBACK_MINUTES:-10080}
+      SQL_POLL_LEASE_SECONDS: ${SQL_POLL_LEASE_SECONDS:-60}
+      SQL_POLL_FAILURE_PAUSE_THRESHOLD: ${SQL_POLL_FAILURE_PAUSE_THRESHOLD:-5}
+    depends_on:
+      integration-migrate:
+        condition: service_completed_successfully
+      identity-access-service:
+        condition: service_healthy
+      case-service:
+        condition: service_healthy
+      kafka-topic-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3003/health/ready').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 10s
+      timeout: 4s
+      retries: 15
+    ports:
+      - "3003:3003"
+    networks: [cdep-network]
+
+  evidence-migrate:
+    build:
+      context: .
+      dockerfile: apps/evidence-service/Dockerfile
+      target: build
+    profiles: [local]
+    command:
+      ["npm", "run", "prisma:deploy", "--workspace", "@cdep/evidence-service"]
+    environment:
+      DATABASE_URL: postgresql://${EVIDENCE_DB_USER:-cdep_evidence_app}:${EVIDENCE_DB_PASSWORD:?Set EVIDENCE_DB_PASSWORD in .env}@postgres:5432/${EVIDENCE_DB_NAME:-cdep_evidence}
+    depends_on:
+      service-database-bootstrap:
+        condition: service_completed_successfully
+    networks: [cdep-network]
+
+  evidence-storage-bootstrap:
+    build:
+      context: .
+      dockerfile: apps/evidence-service/Dockerfile
+      target: build
+    profiles: [local]
+    command: ["node", "apps/evidence-service/dist/src/storage-bootstrap.js"]
+    environment: &evidence-environment
+      PORT: 3004
+      EVIDENCE_SERVICE_PORT: 3004
+      DATABASE_URL: postgresql://${EVIDENCE_DB_USER:-cdep_evidence_app}:${EVIDENCE_DB_PASSWORD:?Set EVIDENCE_DB_PASSWORD in .env}@postgres:5432/${EVIDENCE_DB_NAME:-cdep_evidence}
+      EVIDENCE_DATABASE_URL: postgresql://${EVIDENCE_DB_USER:-cdep_evidence_app}:${EVIDENCE_DB_PASSWORD:?Set EVIDENCE_DB_PASSWORD in .env}@postgres:5432/${EVIDENCE_DB_NAME:-cdep_evidence}
+      CASE_SERVICE_URL: http://case-service:3002
+      JWT_JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
+      JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
+      JWT_ISSUER: ${JWT_ISSUER:-cdep-identity-access-service}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-cdep-api}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: cdep-evidence-service
+      KAFKA_SECURITY_PROTOCOL: ${KAFKA_SECURITY_PROTOCOL:-PLAINTEXT}
+      KAFKA_SASL_MECHANISM: ${KAFKA_SASL_MECHANISM:-SCRAM-SHA-512}
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
+      OUTBOX_ENABLED: "true"
+      OBJECT_STORAGE_ENDPOINT: http://garage:3900
+      OBJECT_STORAGE_PUBLIC_ENDPOINT: ${OBJECT_STORAGE_PUBLIC_ENDPOINT:-http://localhost:3900}
+      OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-cdep-local}
+      OBJECT_STORAGE_QUARANTINE_BUCKET: ${OBJECT_STORAGE_QUARANTINE_BUCKET:-cdep-evidence-quarantine}
+      OBJECT_STORAGE_EVIDENCE_BUCKET: ${OBJECT_STORAGE_EVIDENCE_BUCKET:-cdep-evidence-canonical}
+      OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:?Set OBJECT_STORAGE_ACCESS_KEY in .env}
+      OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:?Set OBJECT_STORAGE_SECRET_KEY in .env}
+      OBJECT_STORAGE_FORCE_PATH_STYLE: "true"
+      OBJECT_STORAGE_DOWNLOAD_TTL_SECONDS: ${OBJECT_STORAGE_DOWNLOAD_TTL_SECONDS:-60}
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      CLAMAV_SCAN_TIMEOUT_MS: ${CLAMAV_SCAN_TIMEOUT_MS:-30000}
+      EVIDENCE_MAX_UPLOAD_BYTES: ${EVIDENCE_MAX_UPLOAD_BYTES:-10485760}
+      EVIDENCE_ALLOWED_MEDIA_TYPES: ${EVIDENCE_ALLOWED_MEDIA_TYPES:-application/pdf,image/png,image/jpeg,text/plain}
+      EVIDENCE_PROCESSING_MAX_ATTEMPTS: ${EVIDENCE_PROCESSING_MAX_ATTEMPTS:-3}
+      EVIDENCE_PROCESSING_LEASE_SECONDS: ${EVIDENCE_PROCESSING_LEASE_SECONDS:-60}
+      EVIDENCE_ORPHAN_SAFETY_PERIOD_HOURS: ${EVIDENCE_ORPHAN_SAFETY_PERIOD_HOURS:-24}
+    depends_on:
+      garage:
+        condition: service_healthy
+    networks: [cdep-network]
+
+  evidence-service:
+    build:
+      context: .
+      dockerfile: apps/evidence-service/Dockerfile
+    profiles: [local]
+    environment:
+      <<: *evidence-environment
+    depends_on:
+      evidence-migrate:
+        condition: service_completed_successfully
+      evidence-storage-bootstrap:
+        condition: service_completed_successfully
+      identity-access-service:
+        condition: service_healthy
+      case-service:
+        condition: service_healthy
+      kafka-topic-bootstrap:
+        condition: service_completed_successfully
+      clamav:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3004/health/ready').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    ports:
+      - "3004:3004"
+    networks: [cdep-network]
+
+  workflow-migrate:
+    build:
+      context: .
+      dockerfile: apps/validation-workflow-service/Dockerfile
+      target: build
+    profiles: [local]
+    command:
+      [
+        "npm",
+        "run",
+        "prisma:deploy",
+        "--workspace",
+        "@cdep/validation-workflow-service",
+      ]
+    environment:
+      DATABASE_URL: postgresql://${WORKFLOW_DB_USER:-cdep_workflow_app}:${WORKFLOW_DB_PASSWORD:?Set WORKFLOW_DB_PASSWORD in .env}@postgres:5432/${WORKFLOW_DB_NAME:-cdep_workflow}
+    depends_on:
+      service-database-bootstrap:
+        condition: service_completed_successfully
+    networks: [cdep-network]
+
+  validation-workflow-service:
+    build:
+      context: .
+      dockerfile: apps/validation-workflow-service/Dockerfile
+    profiles: [local]
+    environment:
+      NODE_ENV: development
+      PORT: 3005
+      WORKFLOW_SERVICE_PORT: 3005
+      DATABASE_URL: postgresql://${WORKFLOW_DB_USER:-cdep_workflow_app}:${WORKFLOW_DB_PASSWORD:?Set WORKFLOW_DB_PASSWORD in .env}@postgres:5432/${WORKFLOW_DB_NAME:-cdep_workflow}
+      WORKFLOW_DATABASE_URL: postgresql://${WORKFLOW_DB_USER:-cdep_workflow_app}:${WORKFLOW_DB_PASSWORD:?Set WORKFLOW_DB_PASSWORD in .env}@postgres:5432/${WORKFLOW_DB_NAME:-cdep_workflow}
+      CASE_SERVICE_URL: http://case-service:3002
+      EVIDENCE_SERVICE_URL: http://evidence-service:3004
+      IDENTITY_SERVICE_URL: http://identity-access-service:3001
+      JWT_JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
+      JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
+      JWT_ISSUER: ${JWT_ISSUER:-cdep-identity-access-service}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-cdep-api}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: cdep-validation-workflow-service
+      KAFKA_SECURITY_PROTOCOL: ${KAFKA_SECURITY_PROTOCOL:-PLAINTEXT}
+      KAFKA_SASL_MECHANISM: ${KAFKA_SASL_MECHANISM:-SCRAM-SHA-512}
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
+      WORKFLOW_CONSUMER_GROUP: cdep-validation-workflow-v1
+      OUTBOX_ENABLED: "true"
+      WORKFLOW_TASK_DEFAULT_DUE_HOURS: ${WORKFLOW_TASK_DEFAULT_DUE_HOURS:-24}
+      WORKFLOW_DECISION_DEFAULT_DUE_HOURS: ${WORKFLOW_DECISION_DEFAULT_DUE_HOURS:-24}
+      WORKFLOW_TIMER_POLL_INTERVAL_MS: ${WORKFLOW_TIMER_POLL_INTERVAL_MS:-1000}
+      WORKFLOW_TIMER_LEASE_SECONDS: ${WORKFLOW_TIMER_LEASE_SECONDS:-60}
+      WORKFLOW_REVALIDATION_DEBOUNCE_MS: ${WORKFLOW_REVALIDATION_DEBOUNCE_MS:-1000}
+      WORKFLOW_CASE_SYNC_MAX_ATTEMPTS: ${WORKFLOW_CASE_SYNC_MAX_ATTEMPTS:-5}
+      WORKFLOW_CASE_SYNC_RETRY_BASE_MS: ${WORKFLOW_CASE_SYNC_RETRY_BASE_MS:-1000}
+    depends_on:
+      workflow-migrate:
+        condition: service_completed_successfully
+      identity-access-service:
+        condition: service_healthy
+      case-service:
+        condition: service_healthy
+      evidence-service:
+        condition: service_healthy
+      kafka-topic-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3005/health/ready').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    ports:
+      - "3005:3005"
+    networks: [cdep-network]
+
+  ai-migrate:
+    build:
+      context: .
+      dockerfile: apps/ai-assessment-service/Dockerfile
+      target: build
+    profiles: [local]
+    command:
+      [
+        "npm",
+        "run",
+        "prisma:deploy",
+        "--workspace",
+        "@cdep/ai-assessment-service",
+      ]
+    environment:
+      DATABASE_URL: postgresql://${AI_DB_USER:-cdep_ai_app}:${AI_DB_PASSWORD:?Set AI_DB_PASSWORD in .env}@postgres:5432/${AI_DB_NAME:-cdep_ai}
+    depends_on:
+      service-database-bootstrap:
+        condition: service_completed_successfully
+    networks: [cdep-network]
+
+  ai-assessment-service:
+    build:
+      context: .
+      dockerfile: apps/ai-assessment-service/Dockerfile
+    profiles: [local]
+    environment:
+      NODE_ENV: development
+      PORT: 3006
+      DATABASE_URL: postgresql://${AI_DB_USER:-cdep_ai_app}:${AI_DB_PASSWORD:?Set AI_DB_PASSWORD in .env}@postgres:5432/${AI_DB_NAME:-cdep_ai}
+      CASE_SERVICE_URL: http://case-service:3002
+      EVIDENCE_SERVICE_URL: http://evidence-service:3004
+      WORKFLOW_SERVICE_URL: http://validation-workflow-service:3005
+      IDENTITY_SERVICE_URL: http://identity-access-service:3001
+      JWT_JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
+      JWT_ISSUER: ${JWT_ISSUER:-cdep-identity-access-service}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-cdep-api}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env}
+      AI_ADAPTER_MODE: MOCK
+      AI_ASSESSMENTS_ENABLED: "true"
+      AI_WORKER_ENABLED: "true"
+      AI_WORKER_POLL_INTERVAL_MS: ${AI_WORKER_POLL_INTERVAL_MS:-500}
+      AI_WORKER_LEASE_SECONDS: ${AI_WORKER_LEASE_SECONDS:-60}
+      AI_OUTPUT_ENCRYPTION_KEY: ${AI_OUTPUT_ENCRYPTION_KEY:?Set AI_OUTPUT_ENCRYPTION_KEY in .env}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: cdep-ai-assessment-service
+      KAFKA_SECURITY_PROTOCOL: ${KAFKA_SECURITY_PROTOCOL:-PLAINTEXT}
+      KAFKA_SASL_MECHANISM: ${KAFKA_SASL_MECHANISM:-SCRAM-SHA-512}
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
+      AI_CONSUMER_GROUP: cdep-ai-assessment-v1
+      OUTBOX_ENABLED: "true"
+    depends_on:
+      ai-migrate:
+        condition: service_completed_successfully
+      identity-access-service:
+        condition: service_healthy
+      case-service:
+        condition: service_healthy
+      evidence-service:
+        condition: service_healthy
+      validation-workflow-service:
+        condition: service_healthy
+      kafka-topic-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3006/health/ready').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    ports:
+      - "3006:3006"
+    networks: [cdep-network]
+
+  fabric-ca-cdep:
+    image: hyperledger/fabric-ca:1.5.15
+    profiles: [fabric, local]
+    environment:
+      FABRIC_CA_HOME: /etc/hyperledger/fabric-ca-server
+      FABRIC_CA_SERVER_CA_NAME: ca-cdep
+      FABRIC_CA_SERVER_TLS_ENABLED: "false"
+      FABRIC_CA_SERVER_PORT: 7054
+    command: ["sh", "-c", "fabric-ca-server start -b admin:adminpw -d"]
+    volumes:
+      - fabric-ca-cdep:/etc/hyperledger/fabric-ca-server
+    healthcheck:
+      test:
+        ["CMD", "fabric-ca-client", "getcainfo", "-u", "http://localhost:7054"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    ports:
+      - "7054:7054"
+    networks:
+      cdep-network:
+        aliases: [ca.cdep.example.com]
+
+  fabric-ca-audit:
+    image: hyperledger/fabric-ca:1.5.15
+    profiles: [fabric, local]
+    environment:
+      FABRIC_CA_HOME: /etc/hyperledger/fabric-ca-server
+      FABRIC_CA_SERVER_CA_NAME: ca-audit
+      FABRIC_CA_SERVER_TLS_ENABLED: "false"
+      FABRIC_CA_SERVER_PORT: 8054
+    command: ["sh", "-c", "fabric-ca-server start -b admin:adminpw -d"]
+    volumes:
+      - fabric-ca-audit:/etc/hyperledger/fabric-ca-server
+    healthcheck:
+      test:
+        ["CMD", "fabric-ca-client", "getcainfo", "-u", "http://localhost:8054"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    ports:
+      - "8054:8054"
+    networks:
+      cdep-network:
+        aliases: [ca.audit.example.com]
+
+  fabric-crypto-bootstrap:
+    image: hyperledger/fabric-tools:2.5.12
+    profiles: [fabric, local]
+    command: ["bash", "/fabric/bootstrap-crypto.sh"]
+    volumes:
+      - ./infrastructure/fabric/crypto-config.yaml:/fabric/crypto-config.yaml:ro
+      - ./infrastructure/fabric/configtx.yaml:/fabric/configtx.yaml:ro
+      - ./infrastructure/fabric/bootstrap-crypto.sh:/fabric/bootstrap-crypto.sh:ro
+      - fabric-crypto:/fabric/crypto-config
+      - fabric-channel-artifacts:/fabric/channel-artifacts
+    depends_on:
+      fabric-ca-cdep:
+        condition: service_healthy
+      fabric-ca-audit:
+        condition: service_healthy
+    networks: [cdep-network]
+
+  fabric-orderer:
+    image: hyperledger/fabric-orderer:2.5.12
+    profiles: [fabric, local]
+    environment:
+      FABRIC_CFG_PATH: /etc/hyperledger/fabric
+      ORDERER_GENERAL_LISTENADDRESS: 0.0.0.0
+      ORDERER_GENERAL_LISTENPORT: 7050
+      ORDERER_GENERAL_BOOTSTRAPMETHOD: none
+      ORDERER_GENERAL_LOCALMSPID: OrdererMSP
+      ORDERER_GENERAL_LOCALMSPDIR: /fabric/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp
+      ORDERER_GENERAL_TLS_ENABLED: "true"
+      ORDERER_GENERAL_TLS_PRIVATEKEY: /fabric/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.key
+      ORDERER_GENERAL_TLS_CERTIFICATE: /fabric/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+      ORDERER_GENERAL_TLS_ROOTCAS: "[/fabric/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt]"
+      ORDERER_CHANNELPARTICIPATION_ENABLED: "true"
+      ORDERER_ADMIN_LISTENADDRESS: 0.0.0.0:9443
+      ORDERER_ADMIN_TLS_ENABLED: "true"
+      ORDERER_ADMIN_TLS_PRIVATEKEY: /fabric/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.key
+      ORDERER_ADMIN_TLS_CERTIFICATE: /fabric/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+      ORDERER_ADMIN_TLS_CLIENTROOTCAS: "[/fabric/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt]"
+      ORDERER_OPERATIONS_LISTENADDRESS: 0.0.0.0:9444
+      ORDERER_METRICS_PROVIDER: prometheus
+    volumes:
+      - fabric-crypto:/fabric/crypto:ro
+      - fabric-orderer-data:/var/hyperledger/production/orderer
+    depends_on:
+      fabric-crypto-bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - "7050:7050"
+      - "9443:9443"
+    networks:
+      cdep-network:
+        aliases: [orderer.example.com]
+
+  fabric-peer-cdep:
+    image: hyperledger/fabric-peer:2.5.12
+    profiles: [fabric, local]
+    environment:
+      FABRIC_CFG_PATH: /etc/hyperledger/fabric
+      CORE_PEER_ID: peer0.cdep.example.com
+      CORE_PEER_ADDRESS: peer0.cdep.example.com:7051
+      CORE_PEER_LISTENADDRESS: 0.0.0.0:7051
+      CORE_PEER_CHAINCODEADDRESS: peer0.cdep.example.com:7052
+      CORE_PEER_CHAINCODELISTENADDRESS: 0.0.0.0:7052
+      CORE_PEER_GOSSIP_EXTERNALENDPOINT: peer0.cdep.example.com:7051
+      CORE_PEER_GOSSIP_BOOTSTRAP: peer0.cdep.example.com:7051
+      CORE_PEER_LOCALMSPID: CDEPMSP
+      CORE_PEER_MSPCONFIGPATH: /fabric/crypto/peerOrganizations/cdep.example.com/peers/peer0.cdep.example.com/msp
+      CORE_PEER_TLS_ENABLED: "true"
+      CORE_PEER_TLS_CERT_FILE: /fabric/crypto/peerOrganizations/cdep.example.com/peers/peer0.cdep.example.com/tls/server.crt
+      CORE_PEER_TLS_KEY_FILE: /fabric/crypto/peerOrganizations/cdep.example.com/peers/peer0.cdep.example.com/tls/server.key
+      CORE_PEER_TLS_ROOTCERT_FILE: /fabric/crypto/peerOrganizations/cdep.example.com/peers/peer0.cdep.example.com/tls/ca.crt
+      CORE_VM_ENDPOINT: unix:///host/var/run/docker.sock
+      CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE: cdep_cdep-network
+      CORE_LEDGER_STATE_STATEDATABASE: goleveldb
+      CORE_OPERATIONS_LISTENADDRESS: 0.0.0.0:9445
+      CORE_METRICS_PROVIDER: prometheus
+      CORE_PEER_PROFILE_ENABLED: "true"
+    command: ["peer", "node", "start"]
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - fabric-crypto:/fabric/crypto:ro
+      - fabric-peer-cdep-data:/var/hyperledger/production
+    depends_on:
+      fabric-crypto-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "peer", "node", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    ports:
+      - "7051:7051"
+      - "9445:9445"
+    networks:
+      cdep-network:
+        aliases: [peer0.cdep.example.com]
+
+  fabric-peer-audit:
+    image: hyperledger/fabric-peer:2.5.12
+    profiles: [fabric, local]
+    environment:
+      FABRIC_CFG_PATH: /etc/hyperledger/fabric
+      CORE_PEER_ID: peer0.audit.example.com
+      CORE_PEER_ADDRESS: peer0.audit.example.com:8051
+      CORE_PEER_LISTENADDRESS: 0.0.0.0:8051
+      CORE_PEER_CHAINCODEADDRESS: peer0.audit.example.com:8052
+      CORE_PEER_CHAINCODELISTENADDRESS: 0.0.0.0:8052
+      CORE_PEER_GOSSIP_EXTERNALENDPOINT: peer0.audit.example.com:8051
+      CORE_PEER_GOSSIP_BOOTSTRAP: peer0.audit.example.com:8051
+      CORE_PEER_LOCALMSPID: AuditMSP
+      CORE_PEER_MSPCONFIGPATH: /fabric/crypto/peerOrganizations/audit.example.com/peers/peer0.audit.example.com/msp
+      CORE_PEER_TLS_ENABLED: "true"
+      CORE_PEER_TLS_CERT_FILE: /fabric/crypto/peerOrganizations/audit.example.com/peers/peer0.audit.example.com/tls/server.crt
+      CORE_PEER_TLS_KEY_FILE: /fabric/crypto/peerOrganizations/audit.example.com/peers/peer0.audit.example.com/tls/server.key
+      CORE_PEER_TLS_ROOTCERT_FILE: /fabric/crypto/peerOrganizations/audit.example.com/peers/peer0.audit.example.com/tls/ca.crt
+      CORE_VM_ENDPOINT: unix:///host/var/run/docker.sock
+      CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE: cdep_cdep-network
+      CORE_LEDGER_STATE_STATEDATABASE: goleveldb
+      CORE_OPERATIONS_LISTENADDRESS: 0.0.0.0:9446
+      CORE_METRICS_PROVIDER: prometheus
+      CORE_PEER_PROFILE_ENABLED: "true"
+    command: ["peer", "node", "start"]
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - fabric-crypto:/fabric/crypto:ro
+      - fabric-peer-audit-data:/var/hyperledger/production
+    depends_on:
+      fabric-crypto-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "peer", "node", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    ports:
+      - "8051:8051"
+      - "9446:9446"
+    networks:
+      cdep-network:
+        aliases: [peer0.audit.example.com]
+
+  fabric-deploy:
+    image: hyperledger/fabric-tools:2.5.12
+    profiles: [fabric, local]
+    environment:
+      FABRIC_CFG_PATH: /etc/hyperledger/fabric
+      FABRIC_CHANNEL_NAME: cdep-proof-channel
+      FABRIC_CHAINCODE_NAME: cdep-proof-registry
+    command: ["bash", "/fabric/deploy-network.sh"]
+    volumes:
+      - ./infrastructure/fabric/deploy-network.sh:/fabric/deploy-network.sh:ro
+      - ./chaincode:/fabric/chaincode:ro
+      - fabric-crypto:/fabric/crypto-config
+      - fabric-channel-artifacts:/fabric/channel-artifacts
+    depends_on:
+      fabric-orderer:
+        condition: service_started
+      fabric-peer-cdep:
+        condition: service_healthy
+      fabric-peer-audit:
+        condition: service_healthy
+    networks: [cdep-network]
+
+  ledger-migrate:
+    build:
+      context: .
+      dockerfile: apps/ledger-service/Dockerfile
+      target: build
+    profiles: [fabric, local]
+    command:
+      ["npm", "run", "prisma:deploy", "--workspace", "@cdep/ledger-service"]
+    environment:
+      DATABASE_URL: postgresql://${LEDGER_DB_USER:-cdep_ledger_app}:${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}@postgres:5432/${LEDGER_DB_NAME:-cdep_ledger}
+    depends_on:
+      service-database-bootstrap:
+        condition: service_completed_successfully
+    networks: [cdep-network]
+
+  ledger-service:
+    build:
+      context: .
+      dockerfile: apps/ledger-service/Dockerfile
+    profiles: [fabric, local]
+    environment:
+      NODE_ENV: development
+      PORT: 3007
+      DATABASE_URL: postgresql://${LEDGER_DB_USER:-cdep_ledger_app}:${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}@postgres:5432/${LEDGER_DB_NAME:-cdep_ledger}
+      LEDGER_PROVIDER: FABRIC
+      LEDGER_WORKER_ENABLED: "true"
+      LEDGER_WORKER_POLL_INTERVAL_MS: ${LEDGER_WORKER_POLL_INTERVAL_MS:-500}
+      LEDGER_WORKER_LEASE_SECONDS: ${LEDGER_WORKER_LEASE_SECONDS:-60}
+      LEDGER_RETRY_MAX_ATTEMPTS: ${FABRIC_RETRY_MAX_ATTEMPTS:-5}
+      CASE_SERVICE_URL: http://case-service:3002
+      EVIDENCE_SERVICE_URL: http://evidence-service:3004
+      WORKFLOW_SERVICE_URL: http://validation-workflow-service:3005
+      JWT_JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
+      JWT_ISSUER: ${JWT_ISSUER:-cdep-identity-access-service}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-cdep-api}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env}
+      FABRIC_CHANNEL_NAME: cdep-proof-channel
+      FABRIC_CHAINCODE_NAME: cdep-proof-registry
+      FABRIC_MSP_ID: CDEPMSP
+      FABRIC_GATEWAY_ENDPOINT: peer0.cdep.example.com:7051
+      FABRIC_GATEWAY_SERVER_NAME: peer0.cdep.example.com
+      FABRIC_GATEWAY_TLS_CERT_PATH: /fabric/crypto/peerOrganizations/cdep.example.com/peers/peer0.cdep.example.com/tls/ca.crt
+      FABRIC_IDENTITY_CERT_PATH: /fabric/crypto/peerOrganizations/cdep.example.com/users/Admin@cdep.example.com/msp/signcerts/Admin@cdep.example.com-cert.pem
+      FABRIC_IDENTITY_KEY_PATH: /fabric/crypto/peerOrganizations/cdep.example.com/users/Admin@cdep.example.com/msp/keystore/priv_sk
+      FABRIC_COMMIT_TIMEOUT_MS: ${FABRIC_COMMIT_TIMEOUT_MS:-30000}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: cdep-ledger-service
+      OUTBOX_ENABLED: "true"
+    volumes:
+      - fabric-crypto:/fabric/crypto:ro
+    depends_on:
+      ledger-migrate:
+        condition: service_completed_successfully
+      fabric-deploy:
+        condition: service_completed_successfully
+      identity-access-service:
+        condition: service_healthy
+      case-service:
+        condition: service_healthy
+      evidence-service:
+        condition: service_healthy
+      validation-workflow-service:
+        condition: service_healthy
+      kafka-topic-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3007/health/ready').then(r=>r.json()).then(v=>{if(v.status!=='ok')process.exit(1)})",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    ports:
+      - "3007:3007"
+    networks: [cdep-network]
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
+    profiles: [local]
+    environment:
+      PORT: 3000
+      IDENTITY_SERVICE_URL: http://identity-access-service:3001
+      CASE_SERVICE_URL: http://case-service:3002
+      INTEGRATION_SERVICE_URL: http://integration-ingestion-service:3003
+      EVIDENCE_SERVICE_URL: http://evidence-service:3004
+      WORKFLOW_SERVICE_URL: http://validation-workflow-service:3005
+      AI_ASSESSMENT_SERVICE_URL: http://ai-assessment-service:3006
+      LEDGER_SERVICE_URL: http://ledger-service:3007
+      EVIDENCE_MAX_UPLOAD_BYTES: ${EVIDENCE_MAX_UPLOAD_BYTES:-10485760}
+      JWT_JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
+      JWT_ISSUER: ${JWT_ISSUER:-cdep-identity-access-service}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-cdep-api}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      identity-access-service:
+        condition: service_healthy
+      case-service:
+        condition: service_healthy
+      integration-ingestion-service:
+        condition: service_healthy
+      evidence-service:
+        condition: service_healthy
+      validation-workflow-service:
+        condition: service_healthy
+      ai-assessment-service:
+        condition: service_healthy
+      ledger-service:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    networks: [cdep-network]
+
+  cdep-web-portal:
+    build:
+      context: .
+      dockerfile: apps/web-portal/Dockerfile
+    profiles: [local]
+    depends_on:
+      - api-gateway
+    ports:
+      - "8080:8080"
+    networks: [cdep-network]
+
+networks:
+  cdep-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  kafka-data:
+  redis-data:
+  garage-meta:
+  garage-data:
+  clamav-data:
+  integration-demo-data:
+  fabric-ca-cdep:
+  fabric-ca-audit:
+  fabric-crypto:
+  fabric-channel-artifacts:
+  fabric-orderer-data:
+  fabric-peer-cdep-data:
+  fabric-peer-audit-data:

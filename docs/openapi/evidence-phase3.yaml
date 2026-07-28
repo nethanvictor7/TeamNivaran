@@ -1,0 +1,216 @@
+openapi: 3.1.0
+info:
+  title: CDEP Phase 3 Evidence API
+  version: 3.0.0
+  description: Streamed evidence intake, immutable versions, access, integrity, lineage, and legal hold.
+servers:
+  - url: http://localhost:3000
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/cases/{caseId}/evidence:
+    parameters: [{ $ref: "#/components/parameters/CaseId" }]
+    post:
+      summary: Stream a new evidence asset and initial version to quarantine
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/EvidenceUpload" }
+      responses:
+        "202": { description: Durably quarantined and queued }
+        "400": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "413": { $ref: "#/components/responses/Problem" }
+        "415": { $ref: "#/components/responses/Problem" }
+    get:
+      summary: List tenant-scoped evidence for a Case
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, maximum: 100 } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: classification, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: source, in: query, schema: { type: string } }
+      responses:
+        "200":
+          { description: Paginated evidence with status/classification summary }
+  /api/v1/evidence/classifications:
+    get:
+      summary: List active platform/organization evidence classifications
+      responses: { "200": { description: Active classification codes } }
+  /api/v1/evidence/{evidenceId}:
+    parameters: [{ $ref: "#/components/parameters/EvidenceId" }]
+    get:
+      summary: Get safe asset and current-version metadata
+      responses:
+        "200": { description: Evidence asset }
+        "404": { $ref: "#/components/responses/Problem" }
+    patch:
+      summary: Update mutable metadata with rowVersion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rowVersion]
+              additionalProperties: false
+              properties:
+                rowVersion: { type: integer, minimum: 1 }
+                classificationCode: { type: string }
+                title: { type: string, maxLength: 240 }
+                description: { type: [string, "null"], maxLength: 2000 }
+                externalReference: { type: [string, "null"], maxLength: 240 }
+                retentionPolicyCode: { type: [string, "null"], maxLength: 80 }
+      responses:
+        "200": { description: Updated }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/evidence/{evidenceId}/versions:
+    parameters: [{ $ref: "#/components/parameters/EvidenceId" }]
+    get:
+      summary: List immutable version metadata
+      responses: { "200": { description: Versions newest first } }
+    post:
+      summary: Stream correction/replacement or initial content for an awaiting reference
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/EvidenceUpload" }
+      responses:
+        "202": { description: Durably quarantined and queued }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/evidence/{evidenceId}/versions/{versionId}:
+    parameters:
+      - { $ref: "#/components/parameters/EvidenceId" }
+      - { $ref: "#/components/parameters/VersionId" }
+    get:
+      summary: Get immutable version metadata
+      responses:
+        "200": { description: Version }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/evidence/{evidenceId}/versions/{versionId}/download-grant:
+    parameters:
+      - { $ref: "#/components/parameters/EvidenceId" }
+      - { $ref: "#/components/parameters/VersionId" }
+    post:
+      summary: Authorize a protected single-version download path
+      responses:
+        "200": { description: Protected path and expiry }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/evidence/{evidenceId}/versions/{versionId}/content:
+    parameters:
+      - { $ref: "#/components/parameters/EvidenceId" }
+      - { $ref: "#/components/parameters/VersionId" }
+    get:
+      summary: Stream an authorized available version as an attachment
+      responses:
+        "200":
+          description: Evidence bytes; Cache-Control is no-store
+          content:
+            application/octet-stream:
+              { schema: { type: string, format: binary } }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/evidence/{evidenceId}/versions/{versionId}/integrity-checks:
+    parameters:
+      - { $ref: "#/components/parameters/EvidenceId" }
+      - { $ref: "#/components/parameters/VersionId" }
+    post:
+      summary: Queue asynchronous integrity verification
+      responses:
+        "202": { description: Queued }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/evidence/{evidenceId}/integrity-checks:
+    parameters: [{ $ref: "#/components/parameters/EvidenceId" }]
+    get:
+      summary: List integrity verification history
+      responses: { "200": { description: Integrity checks } }
+  /api/v1/evidence/{evidenceId}/relationships:
+    parameters: [{ $ref: "#/components/parameters/EvidenceId" }]
+    post:
+      summary: Add an immutable asset relationship
+      responses:
+        "201": { description: Relationship }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/evidence/{evidenceId}/lineage:
+    parameters: [{ $ref: "#/components/parameters/EvidenceId" }]
+    get:
+      summary: Get version lineage and explicit relationships
+      responses: { "200": { description: Lineage } }
+  /api/v1/evidence/{evidenceId}/legal-holds:
+    parameters: [{ $ref: "#/components/parameters/EvidenceId" }]
+    post:
+      summary: Place a legal hold with a reason
+      responses:
+        "201": { description: Hold action }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/evidence/{evidenceId}/legal-holds/{holdId}/release:
+    parameters:
+      - { $ref: "#/components/parameters/EvidenceId" }
+      - name: holdId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Append a legal-hold release action
+      responses:
+        "201": { description: Release action }
+        "409": { $ref: "#/components/responses/Problem" }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    CaseId:
+      name: caseId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    EvidenceId:
+      name: evidenceId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    VersionId:
+      name: versionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, maxLength: 200 }
+  schemas:
+    EvidenceUpload:
+      type: object
+      required: [classificationCode, title, declaredSizeBytes, reason, file]
+      properties:
+        classificationCode: { type: string }
+        title: { type: string, maxLength: 240 }
+        description: { type: string, maxLength: 2000 }
+        externalReference: { type: string, maxLength: 240 }
+        declaredSizeBytes: { type: integer, minimum: 1 }
+        reason:
+          type: string
+          enum: [INITIAL, CORRECTION, REPLACEMENT, DERIVED]
+        file: { type: string, format: binary }
+    Problem:
+      type: object
+      required: [type, title, status, code, detail, correlationId, timestamp]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        code: { type: string }
+        detail: { type: string }
+        correlationId: { type: string }
+        timestamp: { type: string, format: date-time }
+  responses:
+    Problem:
+      description: Correlated API problem
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Problem" }

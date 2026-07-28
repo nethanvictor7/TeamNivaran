@@ -1,0 +1,399 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/@cdep/evidence-prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EvidenceAssetStatus {
+  AWAITING_CONTENT
+  PROCESSING
+  ACTIVE
+  ON_HOLD
+  ARCHIVED
+  REJECTED
+}
+
+enum EvidenceVersionStatus {
+  UPLOAD_PENDING
+  UPLOADED
+  SCANNING
+  AVAILABLE
+  REJECTED
+  FAILED
+}
+
+enum EvidenceSourceType {
+  USER_UPLOAD
+  SOURCE_TRIGGER_REFERENCE
+  INTERNAL
+}
+
+enum EvidenceVersionReason {
+  INITIAL
+  CORRECTION
+  REPLACEMENT
+  DERIVED
+}
+
+enum CreatedByType {
+  USER
+  SERVICE
+  SYSTEM
+}
+
+enum EvidenceRelationshipType {
+  CORRECTS
+  REPLACES
+  DERIVED_FROM
+  SUPPORTS
+  RELATED_TO
+}
+
+enum UploadSessionStatus {
+  OPEN
+  COMPLETED
+  FAILED
+  ABANDONED
+}
+
+enum MalwareScanStatus {
+  CLEAN
+  INFECTED
+  ERROR
+}
+
+enum ProcessingJobType {
+  MALWARE_SCAN
+  INTEGRITY_CHECK
+  RECONCILE
+}
+
+enum ProcessingJobStatus {
+  PENDING
+  LEASED
+  RETRY
+  COMPLETED
+  FAILED
+}
+
+enum IntegrityCheckStatus {
+  PENDING
+  MATCH
+  MISMATCH
+  ERROR
+}
+
+enum AccessOutcome {
+  GRANTED
+  DENIED
+}
+
+enum LegalHoldAction {
+  PLACED
+  RELEASED
+}
+
+enum OrphanKind {
+  QUARANTINE
+  CANONICAL
+  MISSING_CANONICAL
+  ABANDONED_UPLOAD
+}
+
+enum OrphanStatus {
+  CANDIDATE
+  RETAINED
+  CLEANED
+  RESOLVED
+}
+
+enum InboxStatus {
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+model EvidenceAsset {
+  id                  String              @id @default(uuid()) @db.Uuid
+  organizationId      String              @map("organization_id") @db.Uuid
+  evidenceNumber      String              @map("evidence_number") @db.VarChar(40)
+  primaryCaseId       String              @map("primary_case_id") @db.Uuid
+  classificationCode  String              @map("classification_code") @db.VarChar(80)
+  title               String              @db.VarChar(240)
+  description         String?             @db.VarChar(2000)
+  sourceType          EvidenceSourceType  @map("source_type")
+  sourceSystemId      String?             @map("source_system_id") @db.Uuid
+  connectorId         String?             @map("connector_id") @db.Uuid
+  sourceTriggerId     String?             @map("source_trigger_id") @db.Uuid
+  externalReference   String?             @map("external_reference") @db.VarChar(240)
+  status              EvidenceAssetStatus @default(AWAITING_CONTENT)
+  currentVersionId    String?             @unique @map("current_version_id") @db.Uuid
+  latestVersionNumber Int                 @default(0) @map("latest_version_number")
+  retentionPolicyCode String?             @map("retention_policy_code") @db.VarChar(80)
+  rowVersion          Int                 @default(1) @map("row_version")
+  createdByType       CreatedByType       @map("created_by_type")
+  createdById         String              @map("created_by_id") @db.VarChar(120)
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedBy           String              @map("updated_by") @db.VarChar(120)
+  updatedAt           DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([organizationId, evidenceNumber])
+  @@unique([organizationId, sourceTriggerId])
+  @@index([organizationId, primaryCaseId, updatedAt])
+  @@index([organizationId, status, classificationCode])
+  @@map("evidence_assets")
+}
+
+model EvidenceVersion {
+  id                     String                @id @default(uuid()) @db.Uuid
+  organizationId         String                @map("organization_id") @db.Uuid
+  evidenceAssetId        String                @map("evidence_asset_id") @db.Uuid
+  versionNumber          Int                   @map("version_number")
+  previousVersionId      String?               @map("previous_version_id") @db.Uuid
+  previousSha256         String?               @map("previous_sha256") @db.Char(64)
+  processingStatus       EvidenceVersionStatus @default(UPLOAD_PENDING) @map("processing_status")
+  quarantineBucket       String?               @map("quarantine_bucket") @db.VarChar(120)
+  quarantineKey          String?               @unique @map("quarantine_key") @db.VarChar(300)
+  canonicalBucket        String?               @map("canonical_bucket") @db.VarChar(120)
+  canonicalKey           String?               @unique @map("canonical_key") @db.VarChar(300)
+  objectVersionId        String?               @map("object_version_id") @db.VarChar(300)
+  originalFilename       String                @map("original_filename") @db.VarChar(255)
+  displayFilename        String                @map("display_filename") @db.VarChar(255)
+  declaredMediaType      String?               @map("declared_media_type") @db.VarChar(160)
+  detectedMediaType      String?               @map("detected_media_type") @db.VarChar(160)
+  sizeBytes              BigInt?               @map("size_bytes")
+  sha256                 String?               @db.Char(64)
+  scanEngine             String?               @map("scan_engine") @db.VarChar(80)
+  scanSignatureVersion   String?               @map("scan_signature_version") @db.VarChar(120)
+  scanCompletedAt        DateTime?             @map("scan_completed_at") @db.Timestamptz
+  createdReason          EvidenceVersionReason @map("created_reason")
+  sourceReceivedAt       DateTime?             @map("source_received_at") @db.Timestamptz
+  metadataJson           Json                  @default("{}") @map("metadata_json")
+  createdByType          CreatedByType         @map("created_by_type")
+  createdById            String                @map("created_by_id") @db.VarChar(120)
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  availableAt            DateTime?             @map("available_at") @db.Timestamptz
+  failureCode            String?               @map("failure_code") @db.VarChar(80)
+  failureDetailSanitized String?               @map("failure_detail_sanitized") @db.VarChar(500)
+
+  @@unique([evidenceAssetId, versionNumber])
+  @@index([organizationId, evidenceAssetId, createdAt])
+  @@index([processingStatus, createdAt])
+  @@map("evidence_versions")
+}
+
+model EvidenceCaseLink {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  evidenceAssetId String   @map("evidence_asset_id") @db.Uuid
+  caseId          String   @map("case_id") @db.Uuid
+  linkedBy        String   @map("linked_by") @db.VarChar(120)
+  linkedAt        DateTime @default(now()) @map("linked_at") @db.Timestamptz
+
+  @@unique([organizationId, evidenceAssetId, caseId])
+  @@index([organizationId, caseId])
+  @@map("evidence_case_links")
+}
+
+model EvidenceRelationship {
+  id                  String                   @id @default(uuid()) @db.Uuid
+  organizationId      String                   @map("organization_id") @db.Uuid
+  fromEvidenceAssetId String                   @map("from_evidence_asset_id") @db.Uuid
+  toEvidenceAssetId   String                   @map("to_evidence_asset_id") @db.Uuid
+  relationshipType    EvidenceRelationshipType @map("relationship_type")
+  createdBy           String                   @map("created_by") @db.Uuid
+  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([organizationId, fromEvidenceAssetId, toEvidenceAssetId, relationshipType])
+  @@index([organizationId, toEvidenceAssetId])
+  @@map("evidence_relationships")
+}
+
+model EvidenceUploadSession {
+  id                String              @id @default(uuid()) @db.Uuid
+  organizationId    String              @map("organization_id") @db.Uuid
+  evidenceAssetId   String              @map("evidence_asset_id") @db.Uuid
+  evidenceVersionId String              @unique @map("evidence_version_id") @db.Uuid
+  status            UploadSessionStatus @default(OPEN)
+  declaredSizeBytes BigInt?             @map("declared_size_bytes")
+  bytesReceived     BigInt              @default(0) @map("bytes_received")
+  startedAt         DateTime            @default(now()) @map("started_at") @db.Timestamptz
+  completedAt       DateTime?           @map("completed_at") @db.Timestamptz
+  expiresAt         DateTime            @map("expires_at") @db.Timestamptz
+  correlationId     String              @map("correlation_id") @db.Uuid
+  failureCode       String?             @map("failure_code") @db.VarChar(80)
+
+  @@index([status, expiresAt])
+  @@map("evidence_upload_sessions")
+}
+
+model MalwareScanAttempt {
+  id                     String            @id @default(uuid()) @db.Uuid
+  organizationId         String            @map("organization_id") @db.Uuid
+  evidenceVersionId      String            @map("evidence_version_id") @db.Uuid
+  attemptNumber          Int               @map("attempt_number")
+  status                 MalwareScanStatus
+  engine                 String            @db.VarChar(80)
+  signatureVersion       String?           @map("signature_version") @db.VarChar(120)
+  findingCodes           Json              @default("[]") @map("finding_codes")
+  startedAt              DateTime          @map("started_at") @db.Timestamptz
+  completedAt            DateTime          @map("completed_at") @db.Timestamptz
+  failureDetailSanitized String?           @map("failure_detail_sanitized") @db.VarChar(500)
+
+  @@unique([evidenceVersionId, attemptNumber])
+  @@index([organizationId, evidenceVersionId])
+  @@map("malware_scan_attempts")
+}
+
+model EvidenceProcessingJob {
+  id                String              @id @default(uuid()) @db.Uuid
+  organizationId    String              @map("organization_id") @db.Uuid
+  evidenceAssetId   String              @map("evidence_asset_id") @db.Uuid
+  evidenceVersionId String?             @map("evidence_version_id") @db.Uuid
+  integrityCheckId  String?             @map("integrity_check_id") @db.Uuid
+  jobType           ProcessingJobType   @map("job_type")
+  status            ProcessingJobStatus @default(PENDING)
+  attempts          Int                 @default(0)
+  maxAttempts       Int                 @map("max_attempts")
+  availableAt       DateTime            @default(now()) @map("available_at") @db.Timestamptz
+  leaseOwner        String?             @map("lease_owner") @db.Uuid
+  leaseExpiresAt    DateTime?           @map("lease_expires_at") @db.Timestamptz
+  correlationId     String              @map("correlation_id") @db.Uuid
+  causationId       String?             @map("causation_id") @db.Uuid
+  lastErrorCode     String?             @map("last_error_code") @db.VarChar(80)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  completedAt       DateTime?           @map("completed_at") @db.Timestamptz
+
+  @@index([status, availableAt, leaseExpiresAt])
+  @@index([organizationId, evidenceVersionId])
+  @@map("evidence_processing_jobs")
+}
+
+model EvidenceIntegrityCheck {
+  id                     String               @id @default(uuid()) @db.Uuid
+  organizationId         String               @map("organization_id") @db.Uuid
+  evidenceAssetId        String               @map("evidence_asset_id") @db.Uuid
+  evidenceVersionId      String               @map("evidence_version_id") @db.Uuid
+  status                 IntegrityCheckStatus @default(PENDING)
+  expectedSha256         String               @map("expected_sha256") @db.Char(64)
+  calculatedSha256       String?              @map("calculated_sha256") @db.Char(64)
+  requestedBy            String               @map("requested_by") @db.Uuid
+  requestedAt            DateTime             @default(now()) @map("requested_at") @db.Timestamptz
+  completedAt            DateTime?            @map("completed_at") @db.Timestamptz
+  correlationId          String               @map("correlation_id") @db.Uuid
+  failureDetailSanitized String?              @map("failure_detail_sanitized") @db.VarChar(500)
+
+  @@index([organizationId, evidenceAssetId, requestedAt])
+  @@map("evidence_integrity_checks")
+}
+
+model EvidenceAccessRecord {
+  id                String        @id @default(uuid()) @db.Uuid
+  organizationId    String        @map("organization_id") @db.Uuid
+  evidenceAssetId   String        @map("evidence_asset_id") @db.Uuid
+  evidenceVersionId String        @map("evidence_version_id") @db.Uuid
+  actorId           String        @map("actor_id") @db.Uuid
+  action            String        @db.VarChar(40)
+  outcome           AccessOutcome
+  reasonCode        String?       @map("reason_code") @db.VarChar(80)
+  correlationId     String        @map("correlation_id") @db.Uuid
+  occurredAt        DateTime      @default(now()) @map("occurred_at") @db.Timestamptz
+
+  @@index([organizationId, evidenceAssetId, occurredAt])
+  @@map("evidence_access_records")
+}
+
+model EvidenceLegalHold {
+  id              String          @id @default(uuid()) @db.Uuid
+  organizationId  String          @map("organization_id") @db.Uuid
+  evidenceAssetId String          @map("evidence_asset_id") @db.Uuid
+  action          LegalHoldAction
+  reason          String          @db.VarChar(1000)
+  actorId         String          @map("actor_id") @db.Uuid
+  actedAt         DateTime        @default(now()) @map("acted_at") @db.Timestamptz
+  relatedHoldId   String?         @map("related_hold_id") @db.Uuid
+
+  @@index([organizationId, evidenceAssetId, actedAt])
+  @@map("evidence_legal_holds")
+}
+
+model OrphanObjectCandidate {
+  id                String       @id @default(uuid()) @db.Uuid
+  organizationId    String?      @map("organization_id") @db.Uuid
+  evidenceVersionId String?      @map("evidence_version_id") @db.Uuid
+  bucket            String       @db.VarChar(120)
+  objectKey         String       @map("object_key") @db.VarChar(300)
+  kind              OrphanKind
+  status            OrphanStatus @default(CANDIDATE)
+  detectedAt        DateTime     @default(now()) @map("detected_at") @db.Timestamptz
+  eligibleAfter     DateTime     @map("eligible_after") @db.Timestamptz
+  lastCheckedAt     DateTime?    @map("last_checked_at") @db.Timestamptz
+  detailSanitized   String?      @map("detail_sanitized") @db.VarChar(500)
+
+  @@unique([bucket, objectKey, kind])
+  @@index([status, eligibleAfter])
+  @@map("orphan_object_candidates")
+}
+
+model IdempotencyRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  idempotencyKey String   @map("idempotency_key") @db.VarChar(200)
+  operation      String   @db.VarChar(80)
+  requestHash    String   @map("request_hash") @db.Char(64)
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([organizationId, idempotencyKey, operation])
+  @@map("idempotency_records")
+}
+
+model OutboxEvent {
+  id               String        @id @default(uuid()) @db.Uuid
+  aggregateType    String        @map("aggregate_type") @db.VarChar(100)
+  aggregateId      String        @map("aggregate_id") @db.Uuid
+  aggregateVersion Int           @map("aggregate_version")
+  eventType        String        @map("event_type") @db.VarChar(160)
+  eventVersion     String        @map("event_version") @db.VarChar(20)
+  payload          Json
+  correlationId    String        @map("correlation_id") @db.Uuid
+  causationId      String?       @map("causation_id") @db.Uuid
+  organizationId   String        @map("organization_id") @db.Uuid
+  actorType        CreatedByType @map("actor_type")
+  actorId          String        @map("actor_id") @db.VarChar(120)
+  occurredAt       DateTime      @default(now()) @map("occurred_at") @db.Timestamptz
+  publishedAt      DateTime?     @map("published_at") @db.Timestamptz
+  attempts         Int           @default(0)
+  nextAttemptAt    DateTime?     @map("next_attempt_at") @db.Timestamptz
+
+  @@index([publishedAt, nextAttemptAt, occurredAt])
+  @@map("outbox_events")
+}
+
+model InboxEvent {
+  eventId        String      @id @map("event_id") @db.Uuid
+  organizationId String?     @map("organization_id") @db.Uuid
+  eventType      String      @map("event_type") @db.VarChar(160)
+  status         InboxStatus
+  failureCode    String?     @map("failure_code") @db.VarChar(80)
+  processedAt    DateTime    @default(now()) @map("processed_at") @db.Timestamptz
+
+  @@index([organizationId, processedAt])
+  @@map("inbox_events")
+}
+
+model EvidenceClassification {
+  code           String   @id @db.VarChar(80)
+  displayName    String   @map("display_name") @db.VarChar(120)
+  active         Boolean  @default(true)
+  organizationId String?  @map("organization_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([organizationId, code])
+  @@map("evidence_classifications")
+}

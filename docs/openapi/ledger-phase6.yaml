@@ -1,0 +1,368 @@
+openapi: 3.1.0
+info:
+  title: CDEP Provider-Neutral Ledger Proof API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /cases/{caseId}/ledger-summary:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+    get:
+      summary: Read the provider-neutral case ledger summary
+      description: >
+        Returns current Evidence Version eligibility, decision eligibility,
+        lifecycle counts, provider availability, latest verification, latest
+        confirmed proof, and freshness in one tenant-scoped read.
+      responses:
+        "200":
+          description: Case ledger summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseLedgerSummary"
+  /cases/{caseId}/proofs:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+    get:
+      summary: List evidence and decision proof history for a case
+      parameters:
+        - name: proofType
+          in: query
+          schema:
+            enum: [EVIDENCE, DECISION]
+        - name: status
+          in: query
+          schema:
+            enum: [PENDING, SUBMITTED, CONFIRMED, FAILED]
+        - name: evidenceId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: evidenceVersionId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: providerType
+          in: query
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            maxLength: 2048
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 25
+      responses:
+        "200":
+          description: Stable, cursor-paginated case proof history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseProofList"
+  /evidence/{evidenceId}/versions/{versionId}/proofs:
+    parameters:
+      - $ref: "#/components/parameters/EvidenceId"
+      - $ref: "#/components/parameters/VersionId"
+    post:
+      summary: Queue an immutable evidence-version proof
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: Durable proof request accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProofRequest"
+    get:
+      summary: List proof history for the exact evidence version
+      responses:
+        "200":
+          description: Proof history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProofRequest"
+  /evidence/{evidenceId}/versions/{versionId}/proofs/verify:
+    parameters:
+      - $ref: "#/components/parameters/EvidenceId"
+      - $ref: "#/components/parameters/VersionId"
+    post:
+      summary: Verify off-ledger content and the bound ledger proof
+      responses:
+        "200":
+          $ref: "#/components/responses/Verification"
+  /cases/{caseId}/decision-proof:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+    post:
+      summary: Queue a terminal decision-package proof
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: Durable proof request accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProofRequest"
+    get:
+      summary: Read the bound terminal decision proof
+      responses:
+        "200":
+          description: Decision proof
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProofRequest"
+  /cases/{caseId}/decision-proof/verify:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+    post:
+      summary: Verify the current terminal decision package and ledger proof
+      responses:
+        "200":
+          $ref: "#/components/responses/Verification"
+  /ledger/transactions/{transactionId}:
+    get:
+      summary: Query a transaction through its opaque provider binding
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 200
+      responses:
+        "200":
+          description: Provider-neutral transaction status
+  /ledger/proofs/{proofRequestId}/retry:
+    post:
+      summary: Retry a failed proof using its persisted canonical envelope
+      parameters:
+        - name: proofRequestId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "201":
+          description: Proof returned to PENDING
+  /ledger/network/status:
+    get:
+      summary: Read provider-neutral ledger availability
+      responses:
+        "200":
+          description: Safe provider status and opaque references
+  /ledger/reconciliation/run:
+    post:
+      summary: Reconcile submitted and retryable requests
+      responses:
+        "201":
+          description: Completed reconciliation run
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    EvidenceId:
+      name: evidenceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    VersionId:
+      name: versionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CaseId:
+      name: caseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        maxLength: 200
+  responses:
+    Verification:
+      description: Distinct off-ledger, confirmation, and ledger-hash results
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Verification"
+  schemas:
+    CaseLedgerSummary:
+      type: object
+      required:
+        [caseId, state, ledgerAvailability, decision, evidenceCounts, freshness]
+      properties:
+        caseId:
+          type: string
+          format: uuid
+        state:
+          enum:
+            - NOT_ELIGIBLE
+            - NOT_YET_ANCHORED
+            - ANCHORING
+            - PARTIALLY_ANCHORED
+            - ANCHORED
+            - VERIFICATION_ISSUE
+            - LEDGER_UNAVAILABLE
+        ledgerAvailability:
+          type: object
+          description: Safe provider-neutral health projection.
+        decision:
+          type: object
+          description: Terminal-decision eligibility and latest proof state.
+        evidenceCounts:
+          type: object
+        evidenceTargets:
+          type: array
+          items:
+            type: object
+            description: Current immutable Evidence Version and proof state.
+        latestVerification:
+          $ref: "#/components/schemas/CaseProofVerification"
+        latestConfirmed:
+          oneOf:
+            - $ref: "#/components/schemas/CaseProof"
+            - type: "null"
+        freshness:
+          type: object
+          required: [generatedAt, evidenceSnapshotAt, staleAfter]
+    CaseProofList:
+      type: object
+      required: [items, nextCursor, pageSize]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CaseProof"
+        nextCursor:
+          type: [string, "null"]
+        pageSize:
+          type: integer
+    CaseProof:
+      type: object
+      required:
+        - proofRequestId
+        - proofId
+        - proofType
+        - lifecycle
+        - provider
+        - verification
+        - requestedAt
+      properties:
+        proofRequestId:
+          type: string
+          format: uuid
+        proofId:
+          type: string
+          format: uuid
+        proofType:
+          enum: [EVIDENCE, DECISION]
+        lifecycle:
+          enum: [PENDING, SUBMITTED, CONFIRMED, FAILED]
+        retryable:
+          type: boolean
+        evidenceId:
+          type: [string, "null"]
+          format: uuid
+        evidenceVersionId:
+          type: [string, "null"]
+          format: uuid
+        decisionId:
+          type: [string, "null"]
+          format: uuid
+        provider:
+          type: object
+          description: Opaque provider references only.
+        verification:
+          $ref: "#/components/schemas/CaseProofVerification"
+        history:
+          type: array
+          items:
+            type: object
+    CaseProofVerification:
+      type: object
+      required: [offLedgerHash, ledgerConfirmation, ledgerHash, overallVerified]
+      properties:
+        offLedgerHash:
+          enum: [NOT_RUN, MATCH, MISMATCH, UNAVAILABLE]
+        ledgerConfirmation:
+          enum: [NOT_SUBMITTED, PENDING, CONFIRMED, NOT_FOUND, UNAVAILABLE]
+        ledgerHash:
+          enum: [NOT_RUN, MATCH, MISMATCH, UNAVAILABLE]
+        overallVerified:
+          type: boolean
+    ProofRequest:
+      type: object
+      required: [id, proofId, kind, providerType]
+      properties:
+        id:
+          type: string
+          format: uuid
+        proofId:
+          type: string
+          format: uuid
+        kind:
+          enum: [EVIDENCE, DECISION]
+        state:
+          enum:
+            - PENDING
+            - SUBMITTING
+            - SUBMITTED
+            - CONFIRMED
+            - FAILED_RETRYABLE
+            - FAILED_PERMANENT
+            - CONFLICT
+        providerType:
+          type: string
+        binding:
+          type: object
+          description: Opaque provider references; no provider SDK fields.
+    Verification:
+      type: object
+      required:
+        [offLedgerStatus, ledgerProofStatus, ledgerHashStatus, providerState]
+      properties:
+        offLedgerStatus:
+          enum: [OFF_LEDGER_HASH_MATCH, OFF_LEDGER_HASH_MISMATCH]
+        ledgerProofStatus:
+          enum: [LEDGER_PROOF_CONFIRMED, LEDGER_PROOF_UNCONFIRMED]
+        ledgerHashStatus:
+          enum: [LEDGER_HASH_MATCH, LEDGER_HASH_MISMATCH]
+        providerState:
+          enum:
+            - ACCEPTED
+            - PENDING_FINALITY
+            - FINALIZED
+            - REJECTED
+            - NOT_FOUND
+            - UNAVAILABLE

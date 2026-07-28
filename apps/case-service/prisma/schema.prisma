@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/@cdep/case-prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CaseStatus {
+  DRAFT
+  OPEN
+  EVIDENCE_COLLECTION
+  UNDER_REVIEW
+  DECISION_PENDING
+  DECIDED
+  CLOSED
+  CANCELLED
+}
+
+enum CasePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum CasePartyType {
+  BORROWER
+  GUARANTOR
+  DIRECTOR
+  OTHER
+}
+
+enum AssignmentRole {
+  OWNER
+  ANALYST
+  REVIEWER
+  OBSERVER
+}
+
+model DecisionCase {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  organizationId       String                  @map("organization_id") @db.Uuid
+  caseNumber           String                  @map("case_number") @db.VarChar(40)
+  externalReference    String?                 @map("external_reference") @db.VarChar(120)
+  caseType             String                  @map("case_type") @db.VarChar(80)
+  title                String                  @db.VarChar(240)
+  status               CaseStatus              @default(DRAFT)
+  priority             CasePriority            @default(NORMAL)
+  requestedAmountMinor Int?                    @map("requested_amount_minor")
+  currency             String?                 @db.Char(3)
+  openedAt             DateTime?               @map("opened_at") @db.Timestamptz
+  decisionDueAt        DateTime?               @map("decision_due_at") @db.Timestamptz
+  closedAt             DateTime?               @map("closed_at") @db.Timestamptz
+  version              Int                     @default(1)
+  createdBy            String                  @map("created_by") @db.Uuid
+  updatedBy            String                  @map("updated_by") @db.Uuid
+  createdAt            DateTime                @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime                @updatedAt @map("updated_at") @db.Timestamptz
+  parties              CaseParty[]
+  assignments          CaseAssignment[]
+  statusHistory        CaseStatusHistory[]
+  externalReferences   CaseExternalReference[]
+
+  @@unique([organizationId, caseNumber])
+  @@unique([organizationId, externalReference])
+  @@index([organizationId, updatedAt, id])
+  @@map("decision_cases")
+}
+
+model CaseExternalReference {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  caseId         String       @map("case_id") @db.Uuid
+  sourceSystemId String       @map("source_system_id") @db.Uuid
+  referenceType  String       @map("reference_type") @db.VarChar(80)
+  referenceValue String       @map("reference_value") @db.VarChar(240)
+  isPrimary      Boolean      @default(false) @map("is_primary")
+  createdBy      String       @map("created_by") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  decisionCase   DecisionCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, sourceSystemId, referenceType, referenceValue])
+  @@index([caseId])
+  @@map("case_external_references")
+}
+
+model CaseParty {
+  id                String        @id @default(uuid()) @db.Uuid
+  caseId            String        @map("case_id") @db.Uuid
+  partyType         CasePartyType @map("party_type")
+  displayName       String        @map("display_name") @db.VarChar(240)
+  externalReference String?       @map("external_reference") @db.VarChar(120)
+  createdBy         String        @map("created_by") @db.Uuid
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  decisionCase      DecisionCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@map("case_parties")
+}
+
+model CaseAssignment {
+  id           String         @id @default(uuid()) @db.Uuid
+  caseId       String         @map("case_id") @db.Uuid
+  userId       String         @map("user_id") @db.Uuid
+  role         AssignmentRole
+  createdBy    String         @map("created_by") @db.Uuid
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  decisionCase DecisionCase   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, userId, role])
+  @@map("case_assignments")
+}
+
+model CaseStatusHistory {
+  id           String       @id @default(uuid()) @db.Uuid
+  caseId       String       @map("case_id") @db.Uuid
+  fromStatus   CaseStatus?  @map("from_status")
+  toStatus     CaseStatus   @map("to_status")
+  reason       String?      @db.VarChar(1000)
+  changedBy    String       @map("changed_by") @db.Uuid
+  changedAt    DateTime     @default(now()) @map("changed_at") @db.Timestamptz
+  version      Int
+  decisionCase DecisionCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, changedAt])
+  @@map("case_status_history")
+}
+
+model OutboxEvent {
+  id               String    @id @default(uuid()) @db.Uuid
+  aggregateType    String    @map("aggregate_type") @db.VarChar(100)
+  aggregateId      String    @map("aggregate_id") @db.Uuid
+  aggregateVersion Int       @map("aggregate_version")
+  eventType        String    @map("event_type") @db.VarChar(160)
+  eventVersion     String    @map("event_version") @db.VarChar(20)
+  payload          Json
+  correlationId    String    @map("correlation_id") @db.Uuid
+  causationId      String?   @map("causation_id") @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  actorId          String    @map("actor_id") @db.Uuid
+  occurredAt       DateTime  @default(now()) @map("occurred_at") @db.Timestamptz
+  publishedAt      DateTime? @map("published_at") @db.Timestamptz
+  attempts         Int       @default(0)
+  nextAttemptAt    DateTime? @map("next_attempt_at") @db.Timestamptz
+
+  @@index([publishedAt, nextAttemptAt, occurredAt])
+  @@map("outbox_events")
+}
+
+model InboxEvent {
+  eventId     String   @id @map("event_id") @db.Uuid
+  eventType   String   @map("event_type") @db.VarChar(160)
+  processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz
+
+  @@map("inbox_events")
+}
+
+model CaseEvidenceProjection {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
+  caseId             String   @map("case_id") @db.Uuid
+  evidenceAssetId    String   @map("evidence_asset_id") @db.Uuid
+  currentVersionId   String?  @map("current_version_id") @db.Uuid
+  evidenceNumber     String   @map("evidence_number") @db.VarChar(40)
+  classificationCode String   @map("classification_code") @db.VarChar(80)
+  evidenceStatus     String   @map("evidence_status") @db.VarChar(40)
+  sourceType         String   @map("source_type") @db.VarChar(40)
+  occurredAt         DateTime @map("occurred_at") @db.Timestamptz
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([organizationId, evidenceAssetId])
+  @@index([organizationId, caseId, occurredAt])
+  @@map("case_evidence_projections")
+}
+
+model CaseEvidenceTimelineEvent {
+  id              String   @id @default(uuid()) @db.Uuid
+  eventId         String   @unique @map("event_id") @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  caseId          String   @map("case_id") @db.Uuid
+  evidenceAssetId String   @map("evidence_asset_id") @db.Uuid
+  eventType       String   @map("event_type") @db.VarChar(160)
+  evidenceStatus  String   @map("evidence_status") @db.VarChar(40)
+  occurredAt      DateTime @map("occurred_at") @db.Timestamptz
+
+  @@index([organizationId, caseId, occurredAt])
+  @@map("case_evidence_timeline_events")
+}
+
+model IdempotencyRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  idempotencyKey String   @map("idempotency_key") @db.VarChar(200)
+  requestHash    String   @map("request_hash") @db.Char(64)
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([organizationId, idempotencyKey])
+  @@map("idempotency_records")
+}

@@ -1,0 +1,532 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/@cdep/workflow-prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DefinitionStatus {
+  DRAFT
+  PUBLISHED
+  RETIRED
+}
+
+enum WorkflowState {
+  NOT_STARTED
+  VALIDATING
+  EVIDENCE_REQUIRED
+  READY_FOR_REVIEW
+  UNDER_REVIEW
+  CORRECTION_REQUESTED
+  READY_FOR_RECOMMENDATION
+  RECOMMENDATION_SUBMITTED
+  DECISION_PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  CANCELLED
+}
+
+enum TaskStatus {
+  PENDING
+  CLAIMED
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum ValidationStatus {
+  PASS
+  FAIL
+  WARNING
+  NOT_APPLICABLE
+  ERROR
+}
+
+enum RecommendationOutcome {
+  RECOMMEND_APPROVAL
+  RECOMMEND_REJECTION
+  REQUEST_MORE_INFORMATION
+}
+
+enum DecisionOutcome {
+  APPROVED
+  REJECTED
+}
+
+enum CaseSyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+model WorkflowDefinition {
+  id             String                      @id @default(uuid()) @db.Uuid
+  organizationId String?                     @map("organization_id") @db.Uuid
+  code           String                      @db.VarChar(80)
+  name           String                      @db.VarChar(200)
+  description    String?                     @db.VarChar(1000)
+  status         DefinitionStatus            @default(DRAFT)
+  isDefault      Boolean                     @default(false) @map("is_default")
+  createdBy      String                      @map("created_by") @db.Uuid
+  createdAt      DateTime                    @default(now()) @map("created_at") @db.Timestamptz
+  updatedBy      String                      @map("updated_by") @db.Uuid
+  updatedAt      DateTime                    @updatedAt @map("updated_at") @db.Timestamptz
+  rowVersion     Int                         @default(1) @map("row_version")
+  versions       WorkflowDefinitionVersion[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status, isDefault])
+  @@map("workflow_definitions")
+}
+
+model WorkflowDefinitionVersion {
+  id                                String             @id @default(uuid()) @db.Uuid
+  workflowDefinitionId              String             @map("workflow_definition_id") @db.Uuid
+  versionNumber                     Int                @map("version_number")
+  status                            DefinitionStatus   @default(DRAFT)
+  startMode                         String             @default("MANUAL") @map("start_mode") @db.VarChar(40)
+  warningPolicy                     String             @default("NON_BLOCKING") @map("warning_policy") @db.VarChar(40)
+  fourEyesEnabled                   Boolean            @default(true) @map("four_eyes_enabled")
+  prohibitEvidenceSubmitterApproval Boolean            @default(false) @map("prohibit_evidence_submitter_approval")
+  prohibitReviewerApproval          Boolean            @default(false) @map("prohibit_reviewer_approval")
+  defaultReviewDueHours             Int                @default(24) @map("default_review_due_hours")
+  defaultDecisionDueHours           Int                @default(24) @map("default_decision_due_hours")
+  configuration                     Json               @map("configuration_json")
+  publishedBy                       String?            @map("published_by") @db.Uuid
+  publishedAt                       DateTime?          @map("published_at") @db.Timestamptz
+  retiredBy                         String?            @map("retired_by") @db.Uuid
+  retiredAt                         DateTime?          @map("retired_at") @db.Timestamptz
+  createdBy                         String             @map("created_by") @db.Uuid
+  createdAt                         DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  definition                        WorkflowDefinition @relation(fields: [workflowDefinitionId], references: [id], onDelete: Cascade)
+  instances                         WorkflowInstance[]
+
+  @@unique([workflowDefinitionId, versionNumber])
+  @@index([status, publishedAt])
+  @@map("workflow_definition_versions")
+}
+
+model WorkflowInstance {
+  id                          String                           @id @default(uuid()) @db.Uuid
+  organizationId              String                           @map("organization_id") @db.Uuid
+  caseId                      String                           @map("case_id") @db.Uuid
+  caseNumberSnapshot          String                           @map("case_number_snapshot") @db.VarChar(40)
+  workflowDefinitionId        String                           @map("workflow_definition_id") @db.Uuid
+  workflowDefinitionVersionId String                           @map("workflow_definition_version_id") @db.Uuid
+  cycleNumber                 Int                              @map("cycle_number")
+  state                       WorkflowState                    @default(NOT_STARTED)
+  active                      Boolean                          @default(true)
+  activeTaskId                String?                          @map("active_task_id") @db.Uuid
+  currentValidationRunId      String?                          @map("current_validation_run_id") @db.Uuid
+  currentRecommendationId     String?                          @map("current_recommendation_id") @db.Uuid
+  currentDecisionId           String?                          @map("current_decision_id") @db.Uuid
+  caseSyncStatus              CaseSyncStatus                   @default(PENDING) @map("case_sync_status")
+  startedByType               String                           @default("USER") @map("started_by_type") @db.VarChar(20)
+  startedById                 String                           @map("started_by_id") @db.Uuid
+  startedAt                   DateTime                         @default(now()) @map("started_at") @db.Timestamptz
+  completedAt                 DateTime?                        @map("completed_at") @db.Timestamptz
+  cancelledAt                 DateTime?                        @map("cancelled_at") @db.Timestamptz
+  rowVersion                  Int                              @default(1) @map("row_version")
+  createdAt                   DateTime                         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                   DateTime                         @updatedAt @map("updated_at") @db.Timestamptz
+  definitionVersion           WorkflowDefinitionVersion        @relation(fields: [workflowDefinitionVersionId], references: [id])
+  history                     WorkflowStateHistory[]
+  validations                 ValidationRun[]
+  tasks                       WorkflowTask[]
+  reviews                     ReviewSubmission[]
+  corrections                 CorrectionRequest[]
+  recommendations             DecisionRecommendation[]
+  decisions                   DecisionRecord[]
+  actors                      WorkflowActionActor[]
+  comments                    WorkflowComment[]
+  reviewEvidence              ReviewSubmissionEvidence[]
+  recommendationEvidence      DecisionRecommendationEvidence[]
+  decisionEvidence            DecisionEvidenceSnapshot[]
+  recommendationDrafts        WorkflowRecommendationDraft[]
+
+  @@unique([organizationId, caseId, cycleNumber])
+  @@index([organizationId, caseId, active])
+  @@index([organizationId, state, updatedAt])
+  @@map("workflow_instances")
+}
+
+model WorkflowRecommendationDraft {
+  id                 String                         @id @default(uuid()) @db.Uuid
+  organizationId     String                         @map("organization_id") @db.Uuid
+  workflowInstanceId String                         @map("workflow_instance_id") @db.Uuid
+  caseId             String                         @map("case_id") @db.Uuid
+  cycleNumber        Int                            @map("cycle_number")
+  status             String                         @default("DRAFT") @db.VarChar(30)
+  createdBy          String                         @map("created_by") @db.Uuid
+  createdAt          DateTime                       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime                       @updatedAt @map("updated_at") @db.Timestamptz
+  instance           WorkflowInstance               @relation(fields: [workflowInstanceId], references: [id], onDelete: Restrict)
+  aiProvenance       WorkflowAssessmentProvenance[]
+
+  @@index([organizationId, caseId, createdAt])
+  @@map("workflow_recommendation_drafts")
+}
+
+model WorkflowAssessmentProvenance {
+  id                            String                      @id @default(uuid()) @db.Uuid
+  workflowRecommendationDraftId String                      @map("workflow_recommendation_draft_id") @db.Uuid
+  assessmentId                  String                      @map("assessment_id") @db.Uuid
+  selectedItems                 Json                        @map("selected_items_json")
+  acceptedBy                    String                      @map("accepted_by") @db.Uuid
+  acceptedAt                    DateTime                    @default(now()) @map("accepted_at") @db.Timestamptz
+  draft                         WorkflowRecommendationDraft @relation(fields: [workflowRecommendationDraftId], references: [id], onDelete: Restrict)
+
+  @@unique([workflowRecommendationDraftId, assessmentId])
+  @@index([assessmentId])
+  @@map("workflow_assessment_provenance")
+}
+
+model WorkflowStateHistory {
+  id                 String           @id @default(uuid()) @db.Uuid
+  workflowInstanceId String           @map("workflow_instance_id") @db.Uuid
+  fromState          WorkflowState?   @map("from_state")
+  toState            WorkflowState    @map("to_state")
+  action             String           @db.VarChar(80)
+  reasonCode         String?          @map("reason_code") @db.VarChar(80)
+  actorType          String           @map("actor_type") @db.VarChar(20)
+  actorId            String           @map("actor_id") @db.Uuid
+  aggregateVersion   Int              @map("aggregate_version")
+  correlationId      String           @map("correlation_id") @db.Uuid
+  occurredAt         DateTime         @default(now()) @map("occurred_at") @db.Timestamptz
+  instance           WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+
+  @@index([workflowInstanceId, occurredAt])
+  @@map("workflow_state_history")
+}
+
+model ValidationRun {
+  id                   String             @id @default(uuid()) @db.Uuid
+  organizationId       String             @map("organization_id") @db.Uuid
+  workflowInstanceId   String             @map("workflow_instance_id") @db.Uuid
+  runNumber            Int                @map("run_number")
+  triggerType          String             @map("trigger_type") @db.VarChar(40)
+  status               ValidationStatus
+  definitionVersionId  String             @map("definition_version_id") @db.Uuid
+  caseSnapshot         Json               @map("case_snapshot_json")
+  evidenceSnapshot     Json               @map("evidence_snapshot_json")
+  startedByType        String             @map("started_by_type") @db.VarChar(20)
+  startedById          String             @map("started_by_id") @db.Uuid
+  startedAt            DateTime           @default(now()) @map("started_at") @db.Timestamptz
+  completedAt          DateTime?          @map("completed_at") @db.Timestamptz
+  errorCode            String?            @map("error_code") @db.VarChar(80)
+  errorDetailSanitized String?            @map("error_detail_sanitized") @db.VarChar(500)
+  instance             WorkflowInstance   @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+  results              ValidationResult[]
+
+  @@unique([workflowInstanceId, runNumber])
+  @@index([organizationId, completedAt])
+  @@map("validation_runs")
+}
+
+model ValidationResult {
+  id               String           @id @default(uuid()) @db.Uuid
+  validationRunId  String           @map("validation_run_id") @db.Uuid
+  ruleDefinitionId String           @map("rule_definition_id") @db.VarChar(80)
+  ruleVersion      Int              @default(1) @map("rule_version")
+  ruleType         String           @map("rule_type") @db.VarChar(80)
+  status           ValidationStatus
+  messageCode      String           @map("message_code") @db.VarChar(100)
+  safeParameters   Json             @map("safe_parameters_json")
+  inputReferences  Json             @map("input_references_json")
+  evaluatedAt      DateTime         @default(now()) @map("evaluated_at") @db.Timestamptz
+  validationRun    ValidationRun    @relation(fields: [validationRunId], references: [id], onDelete: Cascade)
+
+  @@index([validationRunId, status])
+  @@map("validation_results")
+}
+
+model WorkflowTask {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  organizationId     String                  @map("organization_id") @db.Uuid
+  workflowInstanceId String                  @map("workflow_instance_id") @db.Uuid
+  caseId             String                  @map("case_id") @db.Uuid
+  taskType           String                  @map("task_type") @db.VarChar(60)
+  status             TaskStatus              @default(PENDING)
+  requiredPermission String                  @map("required_permission") @db.VarChar(120)
+  eligibleRoleCodes  Json                    @map("eligible_role_codes_json")
+  assignedUserId     String?                 @map("assigned_user_id") @db.Uuid
+  claimedBy          String?                 @map("claimed_by") @db.Uuid
+  claimedAt          DateTime?               @map("claimed_at") @db.Timestamptz
+  dueAt              DateTime?               @map("due_at") @db.Timestamptz
+  completedAt        DateTime?               @map("completed_at") @db.Timestamptz
+  cancelledAt        DateTime?               @map("cancelled_at") @db.Timestamptz
+  rowVersion         Int                     @default(1) @map("row_version")
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime                @updatedAt @map("updated_at") @db.Timestamptz
+  instance           WorkflowInstance        @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+  assignmentHistory  TaskAssignmentHistory[]
+
+  @@index([organizationId, status, dueAt])
+  @@index([organizationId, assignedUserId, status])
+  @@map("workflow_tasks")
+}
+
+model TaskAssignmentHistory {
+  id             String       @id @default(uuid()) @db.Uuid
+  workflowTaskId String       @map("workflow_task_id") @db.Uuid
+  action         String       @db.VarChar(40)
+  actorId        String       @map("actor_id") @db.Uuid
+  fromUserId     String?      @map("from_user_id") @db.Uuid
+  toUserId       String?      @map("to_user_id") @db.Uuid
+  taskVersion    Int          @map("task_version")
+  occurredAt     DateTime     @default(now()) @map("occurred_at") @db.Timestamptz
+  task           WorkflowTask @relation(fields: [workflowTaskId], references: [id], onDelete: Cascade)
+
+  @@index([workflowTaskId, occurredAt])
+  @@map("task_assignment_history")
+}
+
+model ReviewSubmission {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  workflowInstanceId String                     @map("workflow_instance_id") @db.Uuid
+  validationRunId    String                     @map("validation_run_id") @db.Uuid
+  cycleNumber        Int                        @map("cycle_number")
+  actorId            String                     @map("actor_id") @db.Uuid
+  outcome            String                     @db.VarChar(60)
+  reasonCodes        Json                       @map("reason_codes_json")
+  rationale          String                     @db.VarChar(4000)
+  evidenceSnapshot   Json                       @map("evidence_snapshot_json")
+  submittedAt        DateTime                   @default(now()) @map("submitted_at") @db.Timestamptz
+  aggregateVersion   Int                        @map("aggregate_version")
+  instance           WorkflowInstance           @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+  evidence           ReviewSubmissionEvidence[]
+
+  @@index([workflowInstanceId, submittedAt])
+  @@map("review_submissions")
+}
+
+model ReviewSubmissionEvidence {
+  id                 String           @id @default(uuid()) @db.Uuid
+  workflowInstanceId String           @map("workflow_instance_id") @db.Uuid
+  reviewSubmissionId String           @map("review_submission_id") @db.Uuid
+  evidenceAssetId    String           @map("evidence_asset_id") @db.Uuid
+  evidenceVersionId  String           @map("evidence_version_id") @db.Uuid
+  sha256             String           @db.Char(64)
+  classificationCode String           @map("classification_code") @db.VarChar(100)
+  evidenceStatus     String           @map("evidence_status") @db.VarChar(40)
+  availableAt        DateTime         @map("available_at") @db.Timestamptz
+  snapshotAt         DateTime         @default(now()) @map("snapshot_at") @db.Timestamptz
+  instance           WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Restrict)
+  review             ReviewSubmission @relation(fields: [reviewSubmissionId], references: [id], onDelete: Restrict)
+
+  @@unique([reviewSubmissionId, evidenceVersionId])
+  @@index([workflowInstanceId, snapshotAt])
+  @@map("review_submission_evidence")
+}
+
+model CorrectionRequest {
+  id                 String           @id @default(uuid()) @db.Uuid
+  workflowInstanceId String           @map("workflow_instance_id") @db.Uuid
+  requestedBy        String           @map("requested_by") @db.Uuid
+  targetType         String           @map("target_type") @db.VarChar(60)
+  targetId           String?          @map("target_id") @db.Uuid
+  reasonCode         String           @map("reason_code") @db.VarChar(80)
+  rationale          String           @db.VarChar(4000)
+  requestedAt        DateTime         @default(now()) @map("requested_at") @db.Timestamptz
+  resolvedAt         DateTime?        @map("resolved_at") @db.Timestamptz
+  instance           WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+
+  @@map("correction_requests")
+}
+
+model DecisionRecommendation {
+  id                      String                           @id @default(uuid()) @db.Uuid
+  workflowInstanceId      String                           @map("workflow_instance_id") @db.Uuid
+  validationRunId         String                           @map("validation_run_id") @db.Uuid
+  cycleNumber             Int                              @map("cycle_number")
+  actorId                 String                           @map("actor_id") @db.Uuid
+  outcome                 RecommendationOutcome
+  reasonCodes             Json                             @map("reason_codes_json")
+  rationale               String                           @db.VarChar(4000)
+  conditions              Json
+  evidenceSnapshot        Json                             @map("evidence_snapshot_json")
+  supportingAssessmentIds Json                             @map("supporting_assessment_ids_json")
+  submittedAt             DateTime                         @default(now()) @map("submitted_at") @db.Timestamptz
+  aggregateVersion        Int                              @map("aggregate_version")
+  instance                WorkflowInstance                 @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+  decisions               DecisionRecord[]
+  evidence                DecisionRecommendationEvidence[]
+
+  @@index([workflowInstanceId, submittedAt])
+  @@map("decision_recommendations")
+}
+
+model DecisionRecommendationEvidence {
+  id                       String                 @id @default(uuid()) @db.Uuid
+  workflowInstanceId       String                 @map("workflow_instance_id") @db.Uuid
+  decisionRecommendationId String                 @map("decision_recommendation_id") @db.Uuid
+  evidenceAssetId          String                 @map("evidence_asset_id") @db.Uuid
+  evidenceVersionId        String                 @map("evidence_version_id") @db.Uuid
+  sha256                   String                 @db.Char(64)
+  classificationCode       String                 @map("classification_code") @db.VarChar(100)
+  evidenceStatus           String                 @map("evidence_status") @db.VarChar(40)
+  availableAt              DateTime               @map("available_at") @db.Timestamptz
+  snapshotAt               DateTime               @default(now()) @map("snapshot_at") @db.Timestamptz
+  instance                 WorkflowInstance       @relation(fields: [workflowInstanceId], references: [id], onDelete: Restrict)
+  recommendation           DecisionRecommendation @relation(fields: [decisionRecommendationId], references: [id], onDelete: Restrict)
+
+  @@unique([decisionRecommendationId, evidenceVersionId])
+  @@index([workflowInstanceId, snapshotAt])
+  @@map("decision_recommendation_evidence")
+}
+
+model DecisionRecord {
+  id                        String                     @id @default(uuid()) @db.Uuid
+  organizationId            String                     @map("organization_id") @db.Uuid
+  caseId                    String                     @map("case_id") @db.Uuid
+  workflowInstanceId        String                     @map("workflow_instance_id") @db.Uuid
+  cycleNumber               Int                        @map("cycle_number")
+  recommendationId          String                     @map("recommendation_id") @db.Uuid
+  outcome                   DecisionOutcome
+  reasonCodes               Json                       @map("reason_codes_json")
+  rationale                 String                     @db.VarChar(4000)
+  decidedBy                 String                     @map("decided_by") @db.Uuid
+  decidedAt                 DateTime                   @default(now()) @map("decided_at") @db.Timestamptz
+  definitionVersionSnapshot Json                       @map("definition_version_snapshot_json")
+  validationRunId           String                     @map("validation_run_id") @db.Uuid
+  evidenceSnapshot          Json                       @map("evidence_snapshot_json")
+  supersedesDecisionId      String?                    @map("supersedes_decision_id") @db.Uuid
+  rowVersion                Int                        @default(1) @map("row_version")
+  createdAt                 DateTime                   @default(now()) @map("created_at") @db.Timestamptz
+  instance                  WorkflowInstance           @relation(fields: [workflowInstanceId], references: [id], onDelete: Restrict)
+  recommendation            DecisionRecommendation     @relation(fields: [recommendationId], references: [id], onDelete: Restrict)
+  evidence                  DecisionEvidenceSnapshot[]
+
+  @@unique([workflowInstanceId])
+  @@index([organizationId, caseId, decidedAt])
+  @@map("decision_records")
+}
+
+model DecisionEvidenceSnapshot {
+  id                 String           @id @default(uuid()) @db.Uuid
+  workflowInstanceId String           @map("workflow_instance_id") @db.Uuid
+  decisionRecordId   String           @map("decision_record_id") @db.Uuid
+  evidenceAssetId    String           @map("evidence_asset_id") @db.Uuid
+  evidenceVersionId  String           @map("evidence_version_id") @db.Uuid
+  sha256             String           @db.Char(64)
+  classificationCode String           @map("classification_code") @db.VarChar(100)
+  evidenceStatus     String           @map("evidence_status") @db.VarChar(40)
+  availableAt        DateTime         @map("available_at") @db.Timestamptz
+  snapshotAt         DateTime         @default(now()) @map("snapshot_at") @db.Timestamptz
+  instance           WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Restrict)
+  decision           DecisionRecord   @relation(fields: [decisionRecordId], references: [id], onDelete: Restrict)
+
+  @@unique([decisionRecordId, evidenceVersionId])
+  @@index([workflowInstanceId, snapshotAt])
+  @@map("decision_evidence_snapshots")
+}
+
+model WorkflowActionActor {
+  id                 String           @id @default(uuid()) @db.Uuid
+  workflowInstanceId String           @map("workflow_instance_id") @db.Uuid
+  action             String           @db.VarChar(80)
+  actorId            String           @map("actor_id") @db.Uuid
+  referenceId        String?          @map("reference_id") @db.Uuid
+  occurredAt         DateTime         @default(now()) @map("occurred_at") @db.Timestamptz
+  instance           WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+
+  @@index([workflowInstanceId, action, actorId])
+  @@map("workflow_action_actors")
+}
+
+model WorkflowComment {
+  id                 String           @id @default(uuid()) @db.Uuid
+  organizationId     String           @map("organization_id") @db.Uuid
+  workflowInstanceId String           @map("workflow_instance_id") @db.Uuid
+  taskId             String?          @map("task_id") @db.Uuid
+  authorId           String           @map("author_id") @db.Uuid
+  body               String           @db.VarChar(2000)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  instance           WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_comments")
+}
+
+model IdempotencyRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  actorId        String   @map("actor_id") @db.Uuid
+  route          String   @db.VarChar(160)
+  key            String   @db.VarChar(200)
+  requestHash    String   @map("request_hash") @db.Char(64)
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([organizationId, actorId, route, key])
+  @@map("idempotency_records")
+}
+
+model InboxEvent {
+  eventId     String   @id @map("event_id") @db.Uuid
+  eventType   String   @map("event_type") @db.VarChar(160)
+  payloadHash String   @map("payload_hash") @db.Char(64)
+  processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz
+
+  @@map("inbox_events")
+}
+
+model OutboxEvent {
+  id               String    @id @default(uuid()) @db.Uuid
+  aggregateType    String    @map("aggregate_type") @db.VarChar(100)
+  aggregateId      String    @map("aggregate_id") @db.Uuid
+  aggregateVersion Int       @map("aggregate_version")
+  eventType        String    @map("event_type") @db.VarChar(160)
+  eventVersion     String    @map("event_version") @db.VarChar(20)
+  payload          Json
+  correlationId    String    @map("correlation_id") @db.Uuid
+  causationId      String?   @map("causation_id") @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  actorType        String    @map("actor_type") @db.VarChar(20)
+  actorId          String    @map("actor_id") @db.Uuid
+  occurredAt       DateTime  @default(now()) @map("occurred_at") @db.Timestamptz
+  publishedAt      DateTime? @map("published_at") @db.Timestamptz
+  attempts         Int       @default(0)
+  nextAttemptAt    DateTime? @map("next_attempt_at") @db.Timestamptz
+
+  @@index([publishedAt, nextAttemptAt, occurredAt])
+  @@map("outbox_events")
+}
+
+model CaseSyncOperation {
+  id                 String         @id @default(uuid()) @db.Uuid
+  workflowInstanceId String         @map("workflow_instance_id") @db.Uuid
+  organizationId     String         @map("organization_id") @db.Uuid
+  caseId             String         @map("case_id") @db.Uuid
+  targetStatus       String         @map("target_status") @db.VarChar(40)
+  eventType          String         @map("event_type") @db.VarChar(160)
+  status             CaseSyncStatus @default(PENDING)
+  attempts           Int            @default(0)
+  nextAttemptAt      DateTime?      @map("next_attempt_at") @db.Timestamptz
+  lastErrorCode      String?        @map("last_error_code") @db.VarChar(80)
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  completedAt        DateTime?      @map("completed_at") @db.Timestamptz
+
+  @@unique([workflowInstanceId, eventType])
+  @@index([status, nextAttemptAt])
+  @@map("case_sync_operations")
+}
+
+model WorkflowTimer {
+  id                 String    @id @default(uuid()) @db.Uuid
+  workflowInstanceId String    @map("workflow_instance_id") @db.Uuid
+  taskId             String    @map("task_id") @db.Uuid
+  timerType          String    @map("timer_type") @db.VarChar(60)
+  dueAt              DateTime  @map("due_at") @db.Timestamptz
+  firedAt            DateTime? @map("fired_at") @db.Timestamptz
+  leaseOwner         String?   @map("lease_owner") @db.VarChar(120)
+  leaseExpiresAt     DateTime? @map("lease_expires_at") @db.Timestamptz
+
+  @@unique([taskId, timerType])
+  @@index([firedAt, dueAt])
+  @@map("workflow_timers")
+}
