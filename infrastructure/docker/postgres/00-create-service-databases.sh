@@ -146,3 +146,24 @@ psql --set ON_ERROR_STOP=on --username "$POSTGRES_USER" --dbname "$LEDGER_DB_NAM
   GRANT CONNECT ON DATABASE ${LEDGER_DB_NAME} TO ${LEDGER_DB_USER};
   GRANT USAGE, CREATE ON SCHEMA public TO ${LEDGER_DB_USER};
 SQL
+
+psql --set ON_ERROR_STOP=on --username "$POSTGRES_USER" --dbname postgres <<-SQL
+  DO
+  \$\$
+  BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${AUDIT_DB_USER}') THEN
+      CREATE ROLE ${AUDIT_DB_USER} LOGIN PASSWORD '${AUDIT_DB_PASSWORD}';
+    END IF;
+  END
+  \$\$;
+SQL
+
+if ! psql --username "$POSTGRES_USER" --dbname postgres --tuples-only --command \
+  "SELECT 1 FROM pg_database WHERE datname = '${AUDIT_DB_NAME}'" | grep -q 1; then
+  createdb --username "$POSTGRES_USER" --owner "$AUDIT_DB_USER" "$AUDIT_DB_NAME"
+fi
+
+psql --set ON_ERROR_STOP=on --username "$POSTGRES_USER" --dbname "$AUDIT_DB_NAME" <<-SQL
+  GRANT CONNECT ON DATABASE ${AUDIT_DB_NAME} TO ${AUDIT_DB_USER};
+  GRANT USAGE, CREATE ON SCHEMA public TO ${AUDIT_DB_USER};
+SQL

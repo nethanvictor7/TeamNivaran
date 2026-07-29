@@ -157,6 +157,66 @@ const [admin, reviewer, approver, outsider] = await Promise.all([
 ]);
 
 await request("/api/v1/workflow/tasks", { expected: [401] });
+const manualDefinition = await request("/api/v1/workflow-definitions", {
+  method: "POST",
+  expected: [201],
+  token: admin,
+  json: {
+    code: `VALIDATOR-MANUAL-${suffix}`,
+    name: `Validator manual definition ${suffix}`,
+    description: "Repeatable manual workflow regression definition.",
+    isDefault: true,
+  },
+});
+const manualDefinitionVersion = await request(
+  `/api/v1/workflow-definitions/${manualDefinition.id}/versions`,
+  {
+    method: "POST",
+    expected: [201],
+    token: admin,
+    json: {
+      startMode: "MANUAL",
+      warningPolicy: "NON_BLOCKING",
+      fourEyesEnabled: true,
+      prohibitEvidenceSubmitterApproval: false,
+      prohibitReviewerApproval: false,
+      defaultReviewDueHours: 24,
+      defaultDecisionDueHours: 24,
+      configuration: {
+        caseTypes: ["COMMERCIAL_CREDIT"],
+        requiredEvidence: [
+          {
+            classificationCode: "APPLICATION_FORM",
+            minimumCount: 1,
+            currentOnly: true,
+          },
+        ],
+        rules: [
+          {
+            id: "application-form-present",
+            type: "REQUIRED_EVIDENCE_PRESENT",
+            classificationCode: "APPLICATION_FORM",
+          },
+          {
+            id: "case-title-present",
+            type: "CASE_FIELD_PRESENT",
+            field: "title",
+          },
+        ],
+        reasonCodes: [
+          "STANDARD_REVIEW",
+          "INFORMATION_REQUIRED",
+          "POLICY_REQUIREMENT",
+        ],
+        reviewOutcomes: ["READY_FOR_RECOMMENDATION", "CORRECTION_REQUIRED"],
+      },
+    },
+  },
+);
+await request(
+  `/api/v1/workflow-definitions/${manualDefinition.id}/versions/${manualDefinitionVersion.id}/publish`,
+  { method: "POST", expected: [201], token: admin, json: {} },
+);
 const primary = await createReadyCase(admin, `${suffix}-primary`);
 const startKey = `phase4-start-${suffix}`;
 const started = await request(
@@ -166,7 +226,7 @@ const started = await request(
     expected: [201],
     token: admin,
     headers: { "idempotency-key": startKey },
-    json: {},
+    json: { definitionVersionId: manualDefinitionVersion.id },
   },
 );
 const duplicateStart = await request(
@@ -176,7 +236,7 @@ const duplicateStart = await request(
     expected: [201],
     token: admin,
     headers: { "idempotency-key": startKey },
-    json: {},
+    json: { definitionVersionId: manualDefinitionVersion.id },
   },
 );
 assert.equal(

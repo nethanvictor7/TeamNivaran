@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/@cdep/audit-prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+  DENIED
+  PENDING
+  INFORMATIONAL
+}
+
+enum JobState {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model AuditRecord {
+  id                String       @id @default(uuid()) @db.Uuid
+  eventId           String       @unique @map("event_id") @db.Uuid
+  organizationId    String       @map("organization_id") @db.Uuid
+  occurredAt        DateTime     @map("occurred_at") @db.Timestamptz
+  ingestedAt        DateTime     @default(now()) @map("ingested_at") @db.Timestamptz
+  sourceService     String       @map("source_service") @db.VarChar(120)
+  eventType         String       @map("event_type") @db.VarChar(160)
+  schemaVersion     String       @map("schema_version") @db.VarChar(20)
+  actorType         String       @map("actor_type") @db.VarChar(20)
+  actorId           String       @map("actor_id") @db.VarChar(160)
+  correlationId     String       @map("correlation_id") @db.Uuid
+  causationId       String?      @map("causation_id") @db.Uuid
+  traceId           String?      @map("trace_id") @db.VarChar(64)
+  requestId         String?      @map("request_id") @db.VarChar(128)
+  idempotencyKey    String?      @map("idempotency_key") @db.VarChar(200)
+  resourceType      String       @map("resource_type") @db.VarChar(100)
+  resourceId        String       @map("resource_id") @db.VarChar(160)
+  action            String       @db.VarChar(160)
+  outcome           AuditOutcome
+  classification    String       @default("INTERNAL") @db.VarChar(40)
+  metadata          Json         @default("{}") @map("metadata_json")
+  previousRecordHash String?     @map("previous_record_hash") @db.Char(64)
+  recordHash        String       @unique @map("record_hash") @db.Char(64)
+  sourceTopic       String       @map("source_topic") @db.VarChar(200)
+  sourcePartition   Int          @map("source_partition")
+  sourceOffset      BigInt       @map("source_offset")
+  projectionVersion Int         @default(1) @map("projection_version")
+  lateArrival       Boolean      @default(false) @map("late_arrival")
+
+  @@unique([sourceTopic, sourcePartition, sourceOffset])
+  @@index([organizationId, occurredAt, id])
+  @@index([organizationId, resourceType, resourceId, occurredAt])
+  @@index([organizationId, correlationId, occurredAt])
+  @@index([organizationId, eventType, occurredAt])
+  @@map("audit_records")
+}
+
+model ConsumerCheckpoint {
+  id              String   @id @default(uuid()) @db.Uuid
+  topic           String   @db.VarChar(200)
+  partition       Int
+  offset          BigInt
+  lastEventId     String?  @map("last_event_id") @db.Uuid
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([topic, partition])
+  @@map("consumer_checkpoints")
+}
+
+model QuarantinedEvent {
+  id              String   @id @default(uuid()) @db.Uuid
+  topic           String   @db.VarChar(200)
+  partition       Int
+  offset          BigInt
+  payloadSha256   String   @map("payload_sha256") @db.Char(64)
+  safeErrorCode   String   @map("safe_error_code") @db.VarChar(100)
+  quarantinedAt   DateTime @default(now()) @map("quarantined_at") @db.Timestamptz
+  resolvedAt      DateTime? @map("resolved_at") @db.Timestamptz
+
+  @@unique([topic, partition, offset])
+  @@index([resolvedAt, quarantinedAt])
+  @@map("quarantined_events")
+}
+
+model ReportRun {
+  id                String   @id @default(uuid()) @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  reportKey         String   @map("report_key") @db.VarChar(100)
+  reportVersion     String   @map("report_version") @db.VarChar(20)
+  parameters        Json
+  requestedBy       String   @map("requested_by") @db.Uuid
+  snapshotBoundary  DateTime @map("snapshot_boundary") @db.Timestamptz
+  state             JobState @default(PENDING)
+  rowCount          Int      @default(0) @map("row_count")
+  checksumSha256    String?  @map("checksum_sha256") @db.Char(64)
+  classification    String   @default("CONFIDENTIAL") @db.VarChar(40)
+  artifactBucket    String?  @map("artifact_bucket") @db.VarChar(160)
+  artifactKey       String?  @map("artifact_key") @db.VarChar(500)
+  artifactMediaType String?  @map("artifact_media_type") @db.VarChar(100)
+  artifactFilename  String?  @map("artifact_filename") @db.VarChar(240)
+  failureCode       String?  @map("failure_code") @db.VarChar(100)
+  expiresAt         DateTime @map("expires_at") @db.Timestamptz
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  startedAt         DateTime? @map("started_at") @db.Timestamptz
+  completedAt       DateTime? @map("completed_at") @db.Timestamptz
+
+  @@index([organizationId, createdAt])
+  @@map("report_runs")
+}
+
+model ExportRun {
+  id                String   @id @default(uuid()) @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  format            String   @db.VarChar(10)
+  filters           Json
+  requestedBy       String   @map("requested_by") @db.Uuid
+  snapshotBoundary  DateTime @map("snapshot_boundary") @db.Timestamptz
+  state             JobState @default(PENDING)
+  rowCount          Int      @default(0) @map("row_count")
+  checksumSha256    String?  @map("checksum_sha256") @db.Char(64)
+  artifactBucket    String?  @map("artifact_bucket") @db.VarChar(160)
+  artifactKey       String?  @map("artifact_key") @db.VarChar(500)
+  artifactMediaType String?  @map("artifact_media_type") @db.VarChar(100)
+  artifactFilename  String?  @map("artifact_filename") @db.VarChar(240)
+  failureCode       String?  @map("failure_code") @db.VarChar(100)
+  expiresAt         DateTime @map("expires_at") @db.Timestamptz
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  startedAt         DateTime? @map("started_at") @db.Timestamptz
+  completedAt       DateTime? @map("completed_at") @db.Timestamptz
+
+  @@index([organizationId, createdAt])
+  @@map("export_runs")
+}
+
+model OperationJob {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  type           String   @db.VarChar(40)
+  reason         String   @db.VarChar(500)
+  dryRun         Boolean  @default(true) @map("dry_run")
+  parameters     Json
+  requestedBy    String   @map("requested_by") @db.Uuid
+  state          JobState @default(PENDING)
+  result         Json?
+  failureCode    String?  @map("failure_code") @db.VarChar(100)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  startedAt      DateTime? @map("started_at") @db.Timestamptz
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz
+
+  @@index([organizationId, createdAt])
+  @@map("operation_jobs")
+}
+
+model IdempotencyRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  key            String   @db.VarChar(200)
+  requestHash    String   @map("request_hash") @db.Char(64)
+  resourceType   String   @map("resource_type") @db.VarChar(40)
+  resourceId     String   @map("resource_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([organizationId, key])
+  @@map("idempotency_records")
+}

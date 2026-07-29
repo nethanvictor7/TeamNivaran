@@ -19,3 +19,4 @@ data:
   WORKFLOW_DB_NAME: cdep_workflow
   AI_DB_NAME: cdep_ai
   LEDGER_DB_NAME: cdep_ledger
+  AUDIT_DB_NAME: cdep_audit

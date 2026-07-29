@@ -39,7 +39,7 @@ wait_for_job() {
   exit 1
 }
 
-for secret_name in gitlab-registry alloydb-credentials cdep-database-urls cdep-runtime-secrets; do
+for secret_name in gitlab-registry alloydb-credentials cdep-database-urls cdep-runtime-secrets cdep-audit-secrets; do
   if ! kubectl -n "$namespace" get secret "$secret_name" >/dev/null 2>&1; then
     echo "Required Secret '$secret_name' is missing in namespace '$namespace'." >&2
     exit 1
@@ -73,6 +73,7 @@ migration_jobs=(
   workflow-migrate
   ai-migrate
   ledger-migrate
+  audit-migrate
 )
 kubectl -n "$namespace" delete job "${migration_jobs[@]}" --ignore-not-found
 kubectl apply -f "$script_directory/cdep-migrations.yaml"
@@ -87,7 +88,7 @@ wait_for_job identity-seed 10m
 wait_for_job evidence-storage-bootstrap 10m
 
 kubectl apply -f "$script_directory/cdep-backends.yaml"
-for deployment_name in identity-access-service case-service integration-ingestion-service evidence-service validation-workflow-service ai-assessment-service; do
+for deployment_name in identity-access-service case-service integration-ingestion-service evidence-service validation-workflow-service ai-assessment-service audit-query-service; do
   wait_for_deployment "$deployment_name" 10m
 done
 

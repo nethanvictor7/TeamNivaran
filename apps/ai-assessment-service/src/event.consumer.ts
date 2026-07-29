@@ -1,4 +1,9 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from "@nestjs/common";
 import type { Prisma } from "@cdep/ai-prisma-client";
 import { createHash } from "node:crypto";
 import { Kafka, type Consumer } from "kafkajs";
@@ -8,6 +13,7 @@ import { PrismaService } from "./prisma.service.js";
 @Injectable()
 export class AiInputEventConsumer implements OnModuleInit, OnModuleDestroy {
   private readonly environment = getEnvironment();
+  private readonly logger = new Logger(AiInputEventConsumer.name);
   private readonly consumer: Consumer = new Kafka({
     clientId: `${this.environment.KAFKA_CLIENT_ID}-input`,
     brokers: this.environment.KAFKA_BROKERS,
@@ -30,7 +36,15 @@ export class AiInputEventConsumer implements OnModuleInit, OnModuleDestroy {
         eachMessage: async ({ message }) => {
           if (!message.value) return;
           const raw = message.value.toString();
-          const event = JSON.parse(raw) as {
+          let value: unknown;
+          try {
+            value = JSON.parse(raw);
+          } catch {
+            this.logger.warn({ event: "ai.input.invalid_json" });
+            return;
+          }
+          if (!value || typeof value !== "object") return;
+          const event = value as {
             eventId?: string;
             eventType?: string;
             occurredAt?: string;

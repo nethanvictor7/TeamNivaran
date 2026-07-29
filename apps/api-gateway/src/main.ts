@@ -195,6 +195,7 @@ fastify.get("/health/ready", async (_request, reply) => {
       workflow,
       aiAssessment,
       ledger,
+      audit,
     ] = await Promise.all([
       fetch(`${environment.IDENTITY_SERVICE_URL}/health/ready`, {
         signal: AbortSignal.timeout(2_000),
@@ -217,6 +218,9 @@ fastify.get("/health/ready", async (_request, reply) => {
       fetch(`${environment.LEDGER_SERVICE_URL}/health/ready`, {
         signal: AbortSignal.timeout(3_000),
       }),
+      fetch(`${environment.AUDIT_SERVICE_URL}/health/ready`, {
+        signal: AbortSignal.timeout(3_000),
+      }),
     ]);
     if (
       !identity.ok ||
@@ -225,7 +229,8 @@ fastify.get("/health/ready", async (_request, reply) => {
       !evidence.ok ||
       !workflow.ok ||
       !aiAssessment.ok ||
-      !ledger.ok
+      !ledger.ok ||
+      !audit.ok
     ) {
       throw new Error("A gateway dependency is unavailable.");
     }
@@ -239,6 +244,7 @@ fastify.get("/health/ready", async (_request, reply) => {
         workflowService: "up",
         aiAssessmentService: "up",
         ledgerService: "up",
+        auditQueryService: "up",
       },
     };
   } catch {
@@ -252,6 +258,7 @@ fastify.get("/health/ready", async (_request, reply) => {
         workflowService: "unknown",
         aiAssessmentService: "unknown",
         ledgerService: "unknown",
+        auditQueryService: "unknown",
       },
     });
   }
@@ -262,6 +269,28 @@ await fastify.register(httpProxy, {
   prefix: "/api/v1/auth",
   rewritePrefix: "/api/v1/auth",
   http2: false,
+});
+
+await fastify.register(httpProxy, {
+  upstream: environment.AUDIT_SERVICE_URL,
+  prefix: "/api/v1/audit",
+  rewritePrefix: "/api/v1/audit",
+  http2: false,
+  replyOptions: {
+    onError(reply) {
+      reply.code(503).send({
+        type: "https://cdep.local/problems/service-unavailable",
+        title: "Audit service unavailable",
+        status: 503,
+        code: "AUDIT_SERVICE_UNAVAILABLE",
+        detail:
+          "The audit and reporting service could not process the request.",
+        instance: reply.request.url,
+        correlationId: reply.request.id,
+        timestamp: new Date().toISOString(),
+      });
+    },
+  },
 });
 
 const ledgerProxy = async (request: FastifyRequest, reply: FastifyReply) => {

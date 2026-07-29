@@ -760,6 +760,7 @@ EVIDENCE_DB_NAME=cdep_evidence
 WORKFLOW_DB_NAME=cdep_workflow
 AI_DB_NAME=cdep_ai
 LEDGER_DB_NAME=cdep_ledger
+AUDIT_DB_NAME=cdep_audit
 KAFKA_BROKERS=broker-1:9092,broker-2:9092,broker-3:9092
 KAFKA_SECURITY_PROTOCOL=SASL_SSL
 KAFKA_SASL_MECHANISM=SCRAM-SHA-512
@@ -777,7 +778,7 @@ CLAMAV_HOST=managed-scanner.internal
 
 The checked-in AlloyDB template is
 [`infrastructure/kubernetes/alloydb-config.yaml`](infrastructure/kubernetes/alloydb-config.yaml).
-It configures the shared host, port, user, TLS mode, and the seven
+It configures the shared host, port, user, TLS mode, and the eight
 service-specific database names. The password is intentionally not present in
 Git.
 
@@ -825,6 +826,7 @@ Use the corresponding database-name variable for each workload:
 | Validation Workflow Service   | `WORKFLOW_DB_NAME`    | `cdep_workflow`    |
 | AI Assessment Service         | `AI_DB_NAME`          | `cdep_ai`          |
 | Ledger Service                | `LEDGER_DB_NAME`      | `cdep_ledger`      |
+| Audit Query Service           | `AUDIT_DB_NAME`       | `cdep_audit`       |
 
 For Compose-based managed execution, copy `.env.alloydb.example` to a
 non-versioned environment file, populate `DATABASE_PASSWORD` from the secret

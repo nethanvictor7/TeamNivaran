@@ -1,17 +1,9 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Activity,
-  BriefcaseBusiness,
-  Cable,
-  Database,
-  History,
-  Landmark,
-  LogOut,
-  Plus,
-  X,
-} from "lucide-react";
+import { Activity, Cable, Database, History, Plus, X } from "lucide-react";
 import { PermissionGate, useAuth } from "./auth";
+import { ApplicationShell } from "./ApplicationShell";
+import { StatusBadge } from "./ui";
 
 type Source = {
   id: string;
@@ -59,7 +51,7 @@ type Run = {
 };
 const jsonHeaders = { "content-type": "application/json" };
 
-export function RevisedIntegrationWorkspace({ onCases }: { onCases(): void }) {
+export function RevisedIntegrationWorkspace() {
   const auth = useAuth(),
     client = useQueryClient(),
     [tab, setTab] = useState<"sources" | "triggers" | "runs">("sources"),
@@ -82,61 +74,56 @@ export function RevisedIntegrationWorkspace({ onCases }: { onCases(): void }) {
     enabled: tab === "runs",
   });
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <Brand />
-        <p className="nav-label">Workspace</p>
-        <button className="nav-item" onClick={onCases}>
-          <BriefcaseBusiness size={18} />
-          <span>Decision cases</span>
-        </button>
-        <button
-          className={`nav-item ${tab === "sources" ? "nav-item-active" : ""}`}
-          onClick={() => setTab("sources")}
-        >
-          <Cable size={18} />
-          <span>Source systems</span>
-        </button>
-        <button
-          className={`nav-item ${tab === "triggers" ? "nav-item-active" : ""}`}
-          onClick={() => setTab("triggers")}
-        >
-          <Activity size={18} />
-          <span>Trigger monitor</span>
-        </button>
-        <button
-          className={`nav-item ${tab === "runs" ? "nav-item-active" : ""}`}
-          onClick={() => setTab("runs")}
-        >
-          <History size={18} />
-          <span>SQL run history</span>
-        </button>
-        <div className="sidebar-footer">
-          <div className="environment-row">
-            <span className="environment-dot" />
-            Integration operations
+    <ApplicationShell activeWorkspace="integrations">
+      <section className="module-page">
+        <div className="module-identity">
+          <span className="module-identity-icon" aria-hidden="true">
+            <Cable size={22} />
+          </span>
+          <div>
+            <p className="eyebrow">Connected systems</p>
+            <h1>Integrations</h1>
+            <p className="page-subtitle">
+              Connect the systems that send case information to Aegis and
+              monitor each incoming record.
+            </p>
           </div>
         </div>
-      </aside>
-      <main className="main-content">
-        <header className="topbar glass-panel">
-          <strong>Integration administration</strong>
-          <div className="topbar-actions">
-            <span className="profile-copy">
-              <strong>{auth.identity?.displayName}</strong>
-              <small>{auth.identity?.email}</small>
-            </span>
-            <button className="icon-button" onClick={() => void auth.logout()}>
-              <LogOut size={18} />
-            </button>
-          </div>
-        </header>
+        <nav className="module-tabbar" aria-label="Integration views">
+          <button
+            type="button"
+            className={tab === "sources" ? "module-tab-active" : ""}
+            aria-current={tab === "sources" ? "page" : undefined}
+            onClick={() => setTab("sources")}
+          >
+            <Cable size={16} />
+            Source systems
+          </button>
+          <button
+            type="button"
+            className={tab === "triggers" ? "module-tab-active" : ""}
+            aria-current={tab === "triggers" ? "page" : undefined}
+            onClick={() => setTab("triggers")}
+          >
+            <Activity size={16} />
+            Incoming activity
+          </button>
+          <button
+            type="button"
+            className={tab === "runs" ? "module-tab-active" : ""}
+            aria-current={tab === "runs" ? "page" : undefined}
+            onClick={() => setTab("runs")}
+          >
+            <History size={16} />
+            Sync history
+          </button>
+        </nav>
         {tab === "sources" && (
           <>
             <Heading
-              eyebrow="Phase 2B · governed inputs"
+              eyebrow="Connected systems"
               title="Source systems"
-              subtitle="Configure opaque JSON webhooks and read-only PostgreSQL polling."
+              subtitle="Add a webhook or a read-only PostgreSQL connection."
               action={
                 <PermissionGate permission="integration:source:manage">
                   <button
@@ -190,9 +177,9 @@ export function RevisedIntegrationWorkspace({ onCases }: { onCases(): void }) {
         {tab === "triggers" && (
           <>
             <Heading
-              eyebrow="Immutable source inputs"
-              title="Trigger monitor"
-              subtitle="Webhook receipts and SQL rows share one processing pipeline."
+              eyebrow="Incoming records"
+              title="Incoming activity"
+              subtitle="See what arrived, whether it matched a case and what needs attention."
             />
             <DataCard
               loading={triggers.isLoading}
@@ -236,8 +223,8 @@ export function RevisedIntegrationWorkspace({ onCases }: { onCases(): void }) {
           <>
             <Heading
               eyebrow="Read-only polling"
-              title="SQL ingestion runs"
-              subtitle="Durable checkpoints advance only after complete trigger capture."
+              title="Database sync history"
+              subtitle="Review each database check, the rows received and any errors."
             />
             <DataCard
               loading={runs.isLoading}
@@ -276,7 +263,7 @@ export function RevisedIntegrationWorkspace({ onCases }: { onCases(): void }) {
             </DataCard>
           </>
         )}
-      </main>
+      </section>
       {createSource && (
         <SourceForm
           onClose={() => setCreateSource(false)}
@@ -306,20 +293,7 @@ export function RevisedIntegrationWorkspace({ onCases }: { onCases(): void }) {
           }}
         />
       )}
-    </div>
-  );
-}
-function Brand() {
-  return (
-    <div className="brand">
-      <span className="brand-mark">
-        <Landmark size={22} />
-      </span>
-      <div>
-        <div className="brand-name">CDEP</div>
-        <div className="brand-caption">Decision Evidence</div>
-      </div>
-    </div>
+    </ApplicationShell>
   );
 }
 function Heading({
@@ -345,13 +319,7 @@ function Heading({
   );
 }
 function Status({ value }: { value: string }) {
-  return (
-    <span
-      className={`status ${["ACTIVE", "READY", "PUBLISHED", "SUCCEEDED"].includes(value) ? "status-green" : ""}`}
-    >
-      {value}
-    </span>
-  );
+  return <StatusBadge value={value} />;
 }
 function DataCard({
   loading,
@@ -369,7 +337,7 @@ function DataCard({
   return (
     <section className="card work-queue">
       {loading ? (
-        <div className="empty-state">Loading controlled records…</div>
+        <div className="empty-state">Loading records…</div>
       ) : error ? (
         <div className="api-problem">{error.message}</div>
       ) : empty ? (
@@ -396,7 +364,7 @@ function SourceForm({
   return (
     <Modal
       title="Create source system"
-      eyebrow="Governed source catalog"
+      eyebrow="New connection"
       onClose={onClose}
     >
       <form
@@ -824,7 +792,7 @@ function ConnectorPanel({
             </select>
           </label>
           <label>
-            Safe JSONPath
+            Source field path
             <input value={path} onChange={(e) => setPath(e.target.value)} />
           </label>
           <label>
@@ -962,7 +930,7 @@ function TriggerPanel({
         </div>
         <div className="control-row">
           <span>Source record</span>
-          <strong>{trigger.sourceRecordId || "Generated by CDEP"}</strong>
+          <strong>{trigger.sourceRecordId || "Generated by Aegis"}</strong>
         </div>
       </div>
       {["UNMATCHED", "AMBIGUOUS_CORRELATION"].includes(trigger.status) && (
@@ -972,7 +940,7 @@ function TriggerPanel({
             <input
               value={caseId}
               onChange={(e) => setCaseId(e.target.value)}
-              placeholder="Decision Case UUID"
+              placeholder="Decision case ID"
             />
             <input
               value={reason}

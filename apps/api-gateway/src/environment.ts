@@ -9,6 +9,7 @@ const schema = z.object({
   WORKFLOW_SERVICE_URL: z.string().url().default("http://localhost:3005"),
   AI_ASSESSMENT_SERVICE_URL: z.string().url().default("http://localhost:3006"),
   LEDGER_SERVICE_URL: z.string().url().default("http://localhost:3007"),
+  AUDIT_SERVICE_URL: z.string().url().default("http://localhost:3008"),
   EVIDENCE_MAX_UPLOAD_BYTES: z.coerce
     .number()
     .int()

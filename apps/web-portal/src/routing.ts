@@ -1,5 +1,5 @@
 export type WorkspaceRoute =
-  "cases" | "integrations" | "workflow" | "ai-governance";
+  "cases" | "integrations" | "workflow" | "ai-governance" | "audit";
 
 export type CaseSection =
   | "overview"
@@ -55,7 +55,9 @@ export function parsePortalRoute(
         ? "workflow"
         : parts[0] === "ai-governance"
           ? "ai-governance"
-          : "cases";
+          : parts[0] === "audit"
+            ? "audit"
+            : "cases";
   const caseId =
     workspace === "cases" ? (parts[1] ?? legacy.get("case")) : null;
   const candidate = parts[2] ?? legacy.get("section") ?? "overview";
