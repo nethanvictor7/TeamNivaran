@@ -21,18 +21,30 @@ export class FeatureErrorBoundary extends Component<
     return (
       <main className="auth-screen">
         <section className="login-card" role="alert">
+<<<<<<< HEAD
           <p className="eyebrow">Something went wrong</p>
           <h1>We could not open this page</h1>
           <p>
             Your data has not changed. Try again, and if the problem continues,
             share the correlation reference shown with the error.
+=======
+          <p className="eyebrow">Safe recovery</p>
+          <h1>This view could not be rendered</h1>
+          <p>
+            No data was changed. Retry the route; if the problem persists,
+            provide the request correlation shown by the failed operation.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
           </p>
           <button
             type="button"
             className="primary-button"
             onClick={() => this.setState({ failed: false })}
           >
+<<<<<<< HEAD
             Try again
+=======
+            Retry view
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
           </button>
         </section>
       </main>

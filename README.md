@@ -1,503 +1,208 @@
-# CDEP — Credit Decision Evidence Platform
+# CDEP Platform
 
-CDEP is a tenant-scoped credit decision operations platform. It combines case
-management, source integration, immutable evidence, validation and approval
-workflows, controlled AI decision support, and provider-neutral ledger proofs
-in one auditable system.
+Phase 6 adds provider-neutral evidence and decision proof orchestration backed
+by a real local two-organization Hyperledger Fabric network. Fabric is selected
+with `LEDGER_PROVIDER=FABRIC`; GCUL deliberately fails startup until its
+authoritative adapter contract is available. See
+[Phase 6 ledger operations](docs/ledger-phase6.md) and run
+`npm run validate:phase6` against the Docker network.
 
-The current local implementation runs as an npm workspace monorepo on Docker
-Compose. It uses React, TypeScript, NestJS/Fastify, PostgreSQL, Kafka,
-Garage S3-compatible storage, ClamAV, and a real two-organization Hyperledger
-Fabric network.
+Implementation foundation for the Credit Decision Evidence Platform.
 
-## Current capabilities
+## Implemented in this milestone
 
-- Tenant-scoped decision cases, parties, assignments, status history, priorities,
-  requested amounts, optimistic concurrency, and idempotent creation.
-- Webhook and read-only PostgreSQL source connectors with durable checkpoints,
-  replay, extraction, correlation, manual resolution, and case journey events.
-- Streamed evidence uploads, byte-level SHA-256 hashing, quarantine, ClamAV
-  scanning, immutable versions, lineage, integrity checks, legal holds, and
-  controlled downloads.
-- Immutable workflow definitions, deterministic validation, human task queues,
-  correction cycles, recommendations, four-eyes approval or rejection, timers,
-  and Case Service synchronization.
-- Deterministic MockCortex assessment profiles, pinned evidence references,
-  strict output schemas, human feedback and acceptance, runtime profiles, model
-  policies, and global processing controls.
-- Provider-neutral evidence and decision proof orchestration backed by a real
-  local Hyperledger Fabric channel and Go chaincode.
-- Case-level ledger summaries, proof history, independent off-ledger and
-  on-ledger verification states, retry controls, and provider-outage-safe reads.
-- Responsive operational portal workspaces for decision cases, integrations,
-  workflow operations, evidence, AI governance, and ledger verification.
-
-GCUL is deliberately not implemented. Setting `LEDGER_PROVIDER=GCUL` fails
-closed until an authoritative SDK, signing, contract, and finality contract are
-available.
-
-## Architecture
-
-```text
-Browser
-  │
-  ├── Web Portal :8080
-  │       └── /api reverse proxy
-  │
-  └── API Gateway :3000
-          ├── Identity & Access :3001 ── PostgreSQL
-          ├── Case Service :3002 ─────── PostgreSQL
-          ├── Integration Service :3003  PostgreSQL + Kafka
-          ├── Evidence Service :3004 ─── PostgreSQL + Garage + ClamAV
-          ├── Workflow Service :3005 ─── PostgreSQL + Kafka
-          ├── AI Assessment :3006 ────── PostgreSQL + Kafka
-          └── Ledger Service :3007 ───── PostgreSQL + Fabric Gateway
-                                                │
-                                                └── Fabric channel,
-                                                    two peers, orderer,
-                                                    Go chaincode
-```
-
-Each application service owns its database schema. A service must not query
-another service database directly. Cross-service communication uses authenticated
-HTTP APIs and versioned Kafka events.
-
-## Service inventory
-
-| Component                   | Responsibility                                                              | Host endpoint           |
-| --------------------------- | --------------------------------------------------------------------------- | ----------------------- |
-| Web portal                  | React/Vite operations UI and `/api` reverse proxy                           | `http://localhost:8080` |
-| API Gateway                 | Authentication enforcement, routing, upload proxying, readiness aggregation | `http://localhost:3000` |
-| Identity & Access           | Users, organizations, roles, permissions, JWTs, refresh sessions            | `http://localhost:3001` |
-| Case Service                | Decision cases, parties, assignments, lifecycle, case projections           | `http://localhost:3002` |
-| Integration Service         | Source systems, webhooks, SQL polling, extraction and correlation           | `http://localhost:3003` |
-| Evidence Service            | Evidence assets, versions, scanning, storage, integrity and access          | `http://localhost:3004` |
-| Workflow Service            | Validation, review, corrections, recommendation and approval                | `http://localhost:3005` |
-| AI Assessment Service       | MockCortex assessments, governance, policies and operations                 | `http://localhost:3006` |
-| Ledger Service              | Provider-neutral proof lifecycle, verification and reconciliation           | `http://localhost:3007` |
-| PostgreSQL                  | Isolated application databases                                              | `localhost:5432`        |
-| Kafka                       | Versioned domain events and transactional outboxes                          | `localhost:29092`       |
-| Garage S3 API               | Evidence quarantine and canonical objects                                   | `http://localhost:3900` |
-| ClamAV                      | Evidence malware scanning                                                   | `localhost:3310`        |
-| Fabric CDEP peer            | CDEP organization peer/Gateway                                              | `localhost:7051`        |
-| Fabric Audit peer           | Audit organization peer                                                     | `localhost:8051`        |
-| Fabric orderer              | Raft ordering service                                                       | `localhost:7050`        |
-| Integration demo PostgreSQL | Optional read-only connector source                                         | `localhost:55432`       |
-
-## Technology
-
-- Node.js 24 and npm 11 workspaces
-- TypeScript 5
-- React 19, Vite, TanStack Query, React Hook Form, and Zod
-- NestJS 11 with Fastify
-- Prisma with PostgreSQL 17
-- Kafka in KRaft mode
-- Garage S3-compatible object storage
-- ClamAV 1.5
-- Hyperledger Fabric 2.5, Fabric CA 1.5, Raft, LevelDB, and Go chaincode
-- Docker Engine and Docker Compose v2
+- npm workspace monorepo with Node.js 24 and TypeScript
+- React/Vite web portal with restrained enterprise glassmorphism
+- Lloyds Banking-inspired deep-green palette with original CDEP branding
+- NestJS/Fastify API Gateway
+- NestJS/Fastify Identity & Access Service
+- RS256 access JWTs and JWKS discovery
+- Argon2id password hashing
+- rotating refresh-token sessions with reuse detection
+- organizations, memberships, roles, permissions, users, and transactional outbox
+- Prisma schema, initial PostgreSQL migration, and controlled local seed
+- Docker Compose for PostgreSQL, Kafka KRaft, Redis, Garage, and ClamAV
+- local Docker versus managed-cloud connection switching through environment values
+- shared configuration, API-error, authentication, and event-envelope contracts
+- independently deployable Case Service with tenant-scoped case management
+- case parties, assignments, status timeline, cancellation, idempotent creation,
+  optimistic concurrency, and external source references
+- transactional case outbox publishing to Kafka
+- browser login with memory-only access tokens and HttpOnly refresh sessions
+- source-agnostic webhook ingestion for arbitrary JSON objects and arrays
+- generic SQL polling adapter contract with a read-only PostgreSQL implementation
+- durable watermark/tie-breaker checkpoints, leases, scheduled polling, and run-now
+- optional extraction, deterministic Case Service correlation, replay, manual
+  resolution, canonical Kafka events, and the case decision journey
+- independent Evidence Service with a dedicated database and isolated Prisma
+  client
+- streamed multipart intake into opaque Garage quarantine keys, exact-byte
+  SHA-256 hashing, content-based media detection, and ClamAV scanning
+- immutable evidence assets and versions, controlled proxied downloads,
+  on-demand integrity verification, lineage, relationships, and legal holds
+- leased processing retries, interrupted-upload recovery, orphan reconciliation,
+  transactional evidence outbox/inbox, and idempotent Case projections
+- real Case Evidence portal with filters, progress/cancel, processing polling,
+  version history, integrity results, secure downloads, and hold controls
+- independent Validation Workflow Service with a dedicated database and
+  isolated Prisma client
+- immutable published Workflow definitions, deterministic metadata validation,
+  required-Evidence completeness, atomic human task queues, correction cycles,
+  recommendations, four-eyes decisions, and idempotent Case synchronization
+- real Case Workflow and organization task-queue portal workspaces
+- independent Ledger Service with durable proof sagas, reconciliation,
+  verification attempts, opaque provider bindings, and transactional events
+- deterministic Go proof-registry chaincode and a two-organization Fabric
+  network using Raft ordering, LevelDB, and CDEP+Audit endorsement
+- evidence-version and decision-package proof panels that distinguish local
+  hash, ledger confirmation, and ledger hash results
 
 ## Repository layout
 
 ```text
 apps/
-  web-portal/                    React operations portal
-  api-gateway/                   Public API entry point
-  identity-access-service/       Authentication and authorization
-  case-service/                  Decision case ownership
-  integration-ingestion-service Source connector and trigger processing
-  evidence-service/              Evidence content and metadata ownership
-  validation-workflow-service/   Validation/review/approval workflow
-  ai-assessment-service/         Controlled AI assessment and governance
-  ledger-service/                Provider-neutral proof orchestration
+  web-portal/
+  api-gateway/
+  identity-access-service/
+  case-service/
+  integration-ingestion-service/
+  evidence-service/
+  validation-workflow-service/
+  ai-assessment-service/
+  ledger-service/
 chaincode/
-  evidence-proof/                Fabric proof-registry chaincode
+  evidence-proof/
 packages/
-  config/                        Shared environment helpers
-  contracts/                     Shared API and event contracts
-  errors/                        Shared correlated API problems
+  config/
+  contracts/
+  errors/
 infrastructure/
-  docker/                        Garage and PostgreSQL bootstrap
-  fabric/                        Local Fabric crypto/channel lifecycle
-scripts/                         End-to-end phase validators
-docs/                            Architecture, operations, ADRs and OpenAPI
-compose.yaml                     Local orchestration
+  docker/
+docs/
+  decisions/
+compose.yaml
 ```
 
-## Prerequisites
+## Local setup
 
-Required for the complete local stack:
+Requirements:
 
 - Docker Engine with Docker Compose v2
-- At least 8 GB of memory available to Docker
-- `git`
 
-Required for running repository checks directly on the host:
-
-- Node.js `>=24`
-- npm `>=11`
-
-Confirm the installed versions:
+Create local configuration:
 
 ```bash
-docker --version
-docker compose version
-node --version
-npm --version
-```
-
-## Clone and configure
-
-```bash
-git clone https://gitlab.com/reboot4443731/cdep.git
-cd cdep
 cp .env.example .env
 ```
 
-Edit `.env` and replace every `replace-with-*` or `change-me-*` value. Do not
-commit `.env`.
+Replace every `replace-with-*` value. `GARAGE_RPC_SECRET` must be a random
+64-character hexadecimal value.
 
-Important local values include:
-
-- The shared `DATABASE_PASSWORD` used by `cdep_admin`
-- The local-only service-role passwords used by database bootstrap
-- `BOOTSTRAP_ADMIN_PASSWORD`
-- `INTERNAL_SERVICE_TOKEN`
-- `AI_OUTPUT_ENCRYPTION_KEY` with at least 32 random characters
-- `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` as a 32-byte Base64URL key
-- `GARAGE_RPC_SECRET` as exactly 64 hexadecimal characters
-- `GARAGE_ADMIN_TOKEN`
-- Garage object-storage access and secret keys
-- `DEMO_SOURCE_PASSWORD` when the integration demo profile is used
-
-Example secret generation commands:
-
-```bash
-openssl rand -hex 32
-openssl rand -base64 48
-openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
-```
-
-The generated values must be copied into the matching `.env` fields. Never
-paste secrets into source files, Dockerfiles, logs, screenshots, or issue
-descriptions.
-
-Validate the resolved Compose configuration before building:
-
-```bash
-docker compose --profile local config --quiet
-```
-
-## Build and start
-
-### Complete local platform
-
-The `local` profile includes the application services, infrastructure,
-migrations, seed job, web portal, and Fabric services required by the current
-implementation.
+Build and start the full local stack. Dependency installation, compilation,
+migration, and runtime all happen inside Docker images; host npm is not used.
 
 ```bash
 docker compose --profile local build
 docker compose --profile local up -d
-docker compose --profile local ps
 ```
 
-Open the portal:
+Local endpoints:
 
-```text
-http://localhost:8080
-```
+| Component           | URL                     |
+| ------------------- | ----------------------- |
+| Web portal          | `http://localhost:8080` |
+| API Gateway         | `http://localhost:3000` |
+| Identity service    | `http://localhost:3001` |
+| Case service        | `http://localhost:3002` |
+| Integration service | `http://localhost:3003` |
+| Evidence service    | `http://localhost:3004` |
+| Workflow service    | `http://localhost:3005` |
+| AI service          | `http://localhost:3006` |
+| Ledger service      | `http://localhost:3007` |
+| Garage S3 API       | `http://localhost:3900` |
+| ClamAV              | `localhost:3310`        |
+| Kafka host listener | `localhost:29092`       |
+| PostgreSQL          | `localhost:5432`        |
 
-The seeded administrator login is configured by:
+The seeded administrator credentials are read from `BOOTSTRAP_ADMIN_EMAIL` and
+`BOOTSTRAP_ADMIN_PASSWORD` in the ignored local `.env` file.
 
-```text
-BOOTSTRAP_ADMIN_EMAIL
-BOOTSTRAP_ADMIN_PASSWORD
-```
+## Ledger proofs (Phase 6)
 
-### Build without starting
-
-```bash
-docker compose --profile local build
-```
-
-Build selected services only:
-
-```bash
-docker compose --profile local build \
-  cdep-web-portal api-gateway ledger-service
-```
-
-### Start without rebuilding
-
-```bash
-docker compose --profile local up -d
-```
-
-### Rebuild and restart one component
-
-For example, after changing the portal:
-
-```bash
-docker compose --profile local build cdep-web-portal
-docker compose --profile local up -d cdep-web-portal
-```
-
-For an API service:
-
-```bash
-docker compose --profile local build ai-assessment-service
-docker compose --profile local up -d ai-assessment-service
-```
-
-Compose may recheck bootstrap, migration, and dependency jobs when a dependent
-service is recreated. These jobs are designed to be idempotent.
-
-### Optional integration demo source
-
-```bash
-docker compose --profile integration-demo up -d integration-demo-postgres
-docker compose --profile local up -d
-```
-
-The demo database is `cdep_source_demo`. The user is read from
-`DEMO_SOURCE_READER`, and the password is read from `DEMO_SOURCE_PASSWORD`.
-
-### Fabric-only startup
-
-The `local` profile already includes the Fabric dependencies used by the ledger
-service. To operate the Fabric profile explicitly:
+The `fabric`/`local` Compose profile starts CDEP and Audit CAs, one peer for each
+organization, a single-node Raft orderer, an idempotent channel and chaincode
+lifecycle job, and `ledger-service`. Generated MSP material, private keys,
+channel artifacts, and peer/orderer state live only in named Docker volumes.
 
 ```bash
 docker compose --profile fabric up -d
-docker compose --profile fabric ps
-```
-
-The Fabric lifecycle job creates or reuses:
-
-- CDEP and Audit certificate authorities
-- CDEP and Audit peers
-- A single Raft orderer
-- `cdep-proof-channel`
-- `cdep-proof-registry` chaincode
-- `AND('CDEPMSP.peer','AuditMSP.peer')` endorsement
-
-Generated MSP, TLS, channel, and ledger data are stored in Docker named volumes,
-not in the repository.
-
-## Stop, restart, and remove
-
-Stop the application containers while preserving named volumes:
-
-```bash
-docker compose --profile local down
-```
-
-Restart running services:
-
-```bash
-docker compose --profile local restart
-```
-
-Stop one service:
-
-```bash
-docker compose stop cdep-web-portal
-```
-
-Removing volumes permanently deletes local databases, object storage, Fabric
-ledger state, generated identities, and local test data:
-
-```bash
-docker compose --profile local down -v
-```
-
-Use the volume-removal command only when a complete local reset is intended.
-
-## Health, status, and logs
-
-Check container status:
-
-```bash
+docker compose --profile local up -d
 docker compose --profile local ps
+docker run --rm --network cdep_cdep-network --env-file .env \
+  -e CDEP_BASE_URL=http://api-gateway:3000 \
+  -v "$PWD/scripts:/validator:ro" node:24-bookworm-slim \
+  node /validator/validate-phase6.mjs
 ```
 
-Check aggregate Gateway readiness:
+All application requests use JWT identities. Only `ledger-service` reads the
+mounted Fabric identity, and provider-specific SDK/configuration knowledge is
+confined to `FabricLedgerProvider`. Public APIs and shared events expose CDEP
+proof IDs plus opaque provider references, never peer, MSP, certificate, block,
+or connection-profile objects.
 
-```bash
-curl -fsS http://localhost:3000/health/live
-curl -fsS http://localhost:3000/health/startup
-curl -fsS http://localhost:3000/health/ready
+The chaincode stores hashes and opaque IDs only. Evidence bytes, filenames,
+customer/case data, recommendations, comments, AI output, JWT claims, and human
+actor details remain off-ledger. Historical proofs retain their recorded
+provider binding. A future GCUL change is an additive adapter and explicit
+cutover policy; it cannot rewrite existing Fabric anchors.
+
+Phase 6.1 integrates these existing proofs into each decision case. The
+directly addressable `Ledger & Verification` tab uses
+`GET /api/v1/cases/{caseId}/ledger-summary` and the stable cursor-paginated
+`GET /api/v1/cases/{caseId}/proofs`; evidence rows, workflow decision status,
+the overview, and activity reuse the same case-scoped queries instead of
+issuing one proof request per Evidence Version. Actions remain permission
+gated, retries require confirmation, timestamps are shown in UTC, and provider
+outages preserve readable proof history.
+
+Case routes use browser-restorable paths:
+
+```text
+/cases
+/cases/{caseId}/overview
+/cases/{caseId}/evidence
+/cases/{caseId}/workflow
+/cases/{caseId}/ledger
+/cases/{caseId}/activity
 ```
 
-Check a specific service:
+The case register keeps its non-sensitive search, status, priority, and page
+state in the URL. Ledger responses are validated against shared contracts in
+the portal. Pending proofs poll only while a proof surface is active, use
+bounded backoff, and stop after two minutes. A failed background refresh keeps
+the last trustworthy proof projection visible.
 
-```bash
-curl -fsS http://localhost:3004/health/ready
-curl -fsS http://localhost:3006/health/ready
-curl -fsS http://localhost:3007/health/ready
-```
-
-Follow all logs:
-
-```bash
-docker compose --profile local logs -f
-```
-
-Follow selected logs:
-
-```bash
-docker compose logs -f \
-  cdep-web-portal api-gateway evidence-service ledger-service
-```
-
-Show recent logs:
-
-```bash
-docker compose logs --tail=160 api-gateway ledger-service
-```
-
-## Host development and repository checks
-
-Install workspace dependencies:
-
-```bash
-npm install
-```
-
-Run all static checks and tests:
-
-```bash
-npm run format:check
-npm run typecheck
-npm test
-npm run build
-```
-
-Format source:
-
-```bash
-npm run format
-```
-
-Run only the web portal:
-
-```bash
-npm run dev --workspace @cdep/web-portal
-```
-
-The Vite development server listens on `http://localhost:5173` and proxies
-`/api` to `http://localhost:3000`. The backend stack must already be running.
-
-Portal-specific checks:
-
-```bash
-npm run typecheck --workspace @cdep/web-portal
-npm run test --workspace @cdep/web-portal
-npm run build --workspace @cdep/web-portal
-```
-
-Service-specific checks follow the same workspace form:
-
-```bash
-npm run typecheck --workspace @cdep/evidence-service
-npm run test --workspace @cdep/evidence-service
-npm run build --workspace @cdep/evidence-service
-```
-
-## End-to-end validation
-
-Validators require the local stack, the ignored `.env` file, and the seeded
-users. Validators create controlled test records and may exercise global
-processing controls before restoring them.
-
-### Complete UI, API, and Fabric regression
-
-Phase 6.1 is the current unattended regression entry point:
+Run the complete real-Fabric prerequisite plus Phase 6.1 API validator with:
 
 ```bash
 npm run validate:phase6.1
 ```
 
-It:
+This command validates Compose, rebuilds the affected final source, waits for
+Gateway readiness, runs portal type checks, interaction tests and the
+production build, checks direct-route fallback, then executes the real
+two-organization Fabric API validator. It reads local validator credentials
+from the ignored `.env` file.
 
-1. validates Compose configuration;
-2. rebuilds the portal, Gateway, and Ledger Service;
-3. starts the required services;
-4. waits for Gateway readiness;
-5. runs portal typecheck, component tests, and production build;
-6. verifies direct-route SPA fallback;
-7. runs the real Fabric prerequisite and case-ledger API validators.
+References:
 
-### Direct validators from the Compose network
+- [Phase 6 architecture, operations, recovery, and cutover](docs/ledger-phase6.md)
+- [Phase 6 OpenAPI](docs/openapi/ledger-phase6.yaml)
+- [Provider isolation ADR](docs/decisions/0027-ledger-provider-isolation.md)
+- [On-chain minimization ADR](docs/decisions/0028-ledger-on-chain-minimization.md)
+- [Asynchronous proof saga ADR](docs/decisions/0029-ledger-proof-saga.md)
 
-The following pattern avoids mixing Docker-only DNS names with the host shell:
-
-```bash
-docker run --rm \
-  --network cdep_cdep-network \
-  --env-file .env \
-  -e CDEP_BASE_URL=http://api-gateway:3000 \
-  -v "$PWD/scripts:/validator:ro" \
-  node:24-bookworm-slim \
-  node /validator/validate-phase5.mjs
-```
-
-Change the final filename to run another validator:
-
-```text
-validate-phase2b.mjs
-validate-phase3.mjs
-validate-phase4.mjs
-validate-phase5.mjs
-validate-phase6.mjs
-validate-phase6.1.mjs
-```
-
-Phase 3 can include its Phase 2B regression:
-
-```bash
-docker run --rm \
-  --network cdep_cdep-network \
-  --env-file .env \
-  -e CDEP_BASE_URL=http://api-gateway:3000 \
-  -e CDEP_RUN_PHASE2B_REGRESSION=true \
-  -v "$PWD/scripts:/validator:ro" \
-  node:24-bookworm-slim \
-  node /validator/validate-phase3.mjs
-```
-
-### Host validator form
-
-When running a validator directly on the host, use the host Gateway URL and
-export the required bootstrap values from a secure shell environment:
-
-```bash
-CDEP_BASE_URL=http://localhost:3000 npm run validate:phase6
-```
-
-The Docker-network form is preferred because `--env-file .env` supplies the
-validator credentials without manually exporting them.
-
-## Docker Compose profiles
-
-| Profile            | Purpose                                                                                 |
-| ------------------ | --------------------------------------------------------------------------------------- |
-| `local`            | Complete local application platform, including Fabric dependencies                      |
-| `infrastructure`   | PostgreSQL, Kafka, Garage, ClamAV and bootstrap jobs                                    |
-| `fabric`           | Fabric CAs, peers, orderer, crypto bootstrap, lifecycle and Ledger Service dependencies |
-| `integration-demo` | Optional read-only PostgreSQL source used by connector validation                       |
-
-List the resolved services:
-
-```bash
-docker compose config --profiles
-docker compose --profile local config --services
-```
-
-## Authentication and authorization
-
-Authentication endpoints:
+## Authentication endpoints
 
 ```text
 POST /api/v1/auth/login
@@ -507,260 +212,174 @@ GET  /api/v1/auth/jwks
 GET  /api/v1/auth/me
 ```
 
-The browser keeps the short-lived access token in memory. Refresh tokens use
-rotating strict HttpOnly cookies with reuse detection. The Gateway validates
-the RS256 signature, key ID, issuer, audience, expiry, token type, organization,
-and permission claims.
+The browser receives the access token in the response body. The refresh token
+is available only through a strict, HttpOnly cookie. The API Gateway validates
+RS256 signature, key ID, issuer, audience, expiry, and token type.
 
-The local seed includes configurable administrator, reviewer, approver, auditor,
-and outsider users. They intentionally have different permissions so validators
-can prove tenant isolation, four-eyes controls, and action restrictions.
+## Case API
 
-## Portal routes
-
-Primary workspaces:
-
-```text
-/cases
-/integrations
-/workflow
-/ai-governance
-```
-
-Case workspaces:
-
-```text
-/cases/{caseId}/overview
-/cases/{caseId}/parties
-/cases/{caseId}/assignments
-/cases/{caseId}/evidence
-/cases/{caseId}/workflow
-/cases/{caseId}/assessment
-/cases/{caseId}/ledger
-/cases/{caseId}/activity
-```
-
-Case register search, status, priority, and page state are stored in the URL.
-Case tab routes support refresh and browser history. Inactive case tabs are
-unmounted so they do not continue issuing background requests.
-
-## Case management
-
-Case Service owns:
-
-- case type, title, description, priority, currency, and requested amount;
-- parties and assignments;
-- controlled status transitions and cancellation;
-- tenant scope and stable external references;
-- optimistic row versions;
-- transactional outbox events;
-- evidence availability projections.
-
-Case creation requires `Idempotency-Key`. Mutations that can conflict require
-the current integer row version. Monetary values are supplied as integer minor
-units.
-
-Example:
+All case routes are available through the Gateway under `/api/v1/cases`.
+Creates accept an `Idempotency-Key`; updates and cancellation require the current
+integer `version`. Money is supplied as integer minor units.
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/cases \
   -H "authorization: Bearer $ACCESS_TOKEN" \
   -H "content-type: application/json" \
-  -H "idempotency-key: example-case-001" \
+  -H "idempotency-key: example-001" \
   --data '{"caseType":"COMMERCIAL_CREDIT","title":"Example case","priority":"NORMAL","requestedAmountMinor":2500000,"currency":"GBP"}'
 ```
 
-## Source integration
+Controlled Docker migrations run automatically through `identity-migrate`,
+`case-migrate`, `integration-migrate`, `evidence-migrate`, and
+`workflow-migrate` before their services start. Application builds and
+validation do not require host-installed npm dependencies.
 
-The Integration Service supports exactly two connector types:
+## Validation, review, and approval (Phase 4)
 
-- `WEBHOOK`
-- `SQL_POLL`
+Phase 4 uses immutable Workflow definition versions and exact Evidence Version
+snapshots to drive deterministic validation, human review, correction,
+recommendation, and separate final approval/rejection. Four-eyes and
+separation-of-duties rules are enforced by the service transaction, not the
+portal. Workflow-to-Case synchronization is persisted and idempotent.
 
-Webhook payloads may be JSON objects or arrays. Stable source event IDs provide
-idempotency: the same ID and bytes return the original receipt, while the same
-ID with different bytes returns `409`.
+See [Phase 4 Workflow operations](docs/workflow-phase4.md) and
+[Phase 4 OpenAPI](docs/openapi/workflow-phase4.yaml).
+
+Run the repeatable Phase 4 validator from the Compose network:
+
+```bash
+docker run --rm --network cdep_cdep-network --env-file .env \
+  -e CDEP_BASE_URL=http://api-gateway:3000 \
+  -v "$PWD/scripts:/validator:ro" node:24-bookworm-slim \
+  node /validator/validate-phase4.mjs
+```
+
+## Source integration (Phase 2B)
+
+The portal Integrations area uses real `/api/v1/integration` APIs for source
+systems, webhook and SQL connectors, credentials, extraction, correlation,
+trigger operations, polling history, manual resolution, and the case journey.
+There are exactly two connector types in Phase 2B: `WEBHOOK` and `SQL_POLL`.
+
+Start the optional read-only PostgreSQL demonstration source with:
+
+```bash
+docker compose --profile integration-demo up -d integration-demo-postgres
+docker compose --profile local up -d
+```
+
+The demo source is available inside Compose as `integration-demo-postgres:5432`
+and from the host on `localhost:55432`. Use database `cdep_source_demo`, user
+`DEMO_SOURCE_READER`, and the local-only `DEMO_SOURCE_PASSWORD` from the ignored
+`.env` file. Production source accounts
+must have only `CONNECT`, schema `USAGE`, and `SELECT`; polling never executes
+caller-provided SQL and orders by a validated watermark plus tie-breaker.
+
+Webhook connectors expose:
 
 ```text
 POST /api/v1/integration/hooks/{connectorKey}
-x-cdep-webhook-key: {connector API key}
-x-source-event-id: {optional stable source event ID}
+x-cdep-webhook-key: {static connector API key}
+x-source-event-id: {optional stable source identifier}
 ```
 
-SQL polling permits only configured identifiers and selected columns from one
-table or view. It never executes caller-provided SQL. Its checkpoint is the
-ordered `(watermark, tieBreaker)` pair, and checkpoint advancement commits with
-the captured batch.
+The body may be any valid JSON object or array. No request schema, response
+schema, or business event definition is configured. Calls without a source ID
+are accepted. When an ID is supplied, same-ID/same-bytes returns the original
+receipt and same-ID/different-bytes returns `409`. Successful capture returns
+`202` with `receiptId`, `status`, `correlationId`, and `receivedAt`.
 
-Replay uses the immutable stored trigger without calling the source again.
-Manual resolution records the selected case, actor, and reason.
-
-## Evidence management
-
-Evidence bytes are not stored in PostgreSQL, Kafka, or Fabric.
-
-The upload path is:
-
-```text
-Upload stream
-  → opaque quarantine object
-  → exact-byte SHA-256
-  → media detection
-  → ClamAV scan
-  → canonical object copy
-  → canonical size/hash verification
-  → AVAILABLE immutable Evidence Version
+```bash
+curl -i -X POST \
+  "http://localhost:8080/api/v1/integration/hooks/$CONNECTOR_KEY" \
+  -H "content-type: application/json" \
+  -H "x-cdep-webhook-key: $WEBHOOK_KEY" \
+  -H "x-source-event-id: source-event-1001" \
+  --data '{"application":{"reference":"APP-1001"},"sourceSpecific":{"status":"REFERRED"}}'
 ```
+
+SQL polling selects only configured columns from one validated table or view.
+The checkpoint is the ordered `(watermark, tieBreaker)` pair. Capture of the
+batch, checkpoint advancement, and successful run record commit in one
+transaction, so a failed transaction cannot skip source rows. A database lease
+and scheduler prevent concurrent polling; run-now uses the same path.
+
+Replay reprocesses the immutable stored trigger without calling the source
+again. Required-extraction failures and unmatched/ambiguous correlations remain
+visible. Manual resolution validates the selected case through Case Service and
+records the actor and reason.
+
+> Phase 2B accepts opaque inbound webhook JSON and polls configured PostgreSQL
+> tables/views. It does not define webhook payload schemas, customize webhook
+> responses, accept arbitrary SQL, or automatically understand source business
+> semantics.
+
+Detailed references:
+
+- [Integration API/OpenAPI](docs/openapi/integration-phase2b.yaml)
+- [Connector setup and operations](docs/integration-connectors.md)
+- [Cloud and security configuration](docs/integration-cloud-security.md)
+
+## Evidence management (Phase 3)
+
+Evidence content is never stored in PostgreSQL or Kafka. Upload requests stream
+through the Gateway and Evidence Service into an opaque quarantine object while
+enforcing the configured absolute byte limit and calculating SHA-256. Content
+is detected from bytes, then a leased worker streams the quarantine object to
+ClamAV. Only a clean scan can copy the exact object to a new write-once canonical
+key and atomically make the version available.
 
 The default local policy accepts PDF, PNG, JPEG, and plain text up to 10 MiB.
-The authoritative values are configured by:
+Change `EVIDENCE_ALLOWED_MEDIA_TYPES` and `EVIDENCE_MAX_UPLOAD_BYTES` through
+deployment configuration. A declared type is advisory; detected content must be
+allowed and agree with the declaration. Infected, unscanned, failed, and rejected
+versions cannot receive download access.
 
-```text
-EVIDENCE_ALLOWED_MEDIA_TYPES
-EVIDENCE_MAX_UPLOAD_BYTES
-EVIDENCE_PROCESSING_MAX_ATTEMPTS
-EVIDENCE_PROCESSING_LEASE_SECONDS
-EVIDENCE_ORPHAN_SAFETY_PERIOD_HOURS
+Corrections and replacements always create a sequential immutable version with
+the prior version ID and hash. Controlled downloads are protected proxied
+streams and are recorded without persisting object keys or signed URLs.
+Integrity checks asynchronously re-stream canonical bytes and compare a new
+hash without changing the authoritative stored hash.
+
+An Integration trigger creates an awaiting evidence reference only when its
+explicit trigger type is `evidence.reference.received`, it resolves exactly one
+Case, and its allowlisted typed projection contains classification, title, and
+external reference. JSON/SQL trigger data is metadata only; URLs, Base64, and
+file bytes are never fetched or treated as evidence.
+
+References:
+
+- [Evidence API/OpenAPI](docs/openapi/evidence-phase3.yaml)
+- [Evidence upload, storage, access, and cloud configuration](docs/evidence-management.md)
+- [Processing recovery and orphan reconciliation runbook](docs/evidence-recovery-runbook.md)
+
+Docker validation commands:
+
+```bash
+docker compose --profile local config --quiet
+docker compose --profile local build
+docker compose --profile local up -d
+docker compose --profile local ps
+docker run --rm --network cdep_cdep-network --env-file .env \
+  -e CDEP_BASE_URL=http://api-gateway:3000 \
+  -v "$PWD:/workspace:ro" -w /workspace node:24-bookworm-slim \
+  node scripts/validate-phase2b.mjs
+
+docker run --rm --network cdep_cdep-network --env-file .env \
+  -e CDEP_BASE_URL=http://api-gateway:3000 \
+  -e CDEP_RUN_PHASE2B_REGRESSION=true \
+  -v "$PWD:/workspace:ro" -w /workspace node:24-bookworm-slim \
+  node scripts/validate-phase3.mjs
 ```
 
-Corrections and replacements create a new version linked to the previous version
-and previous SHA-256. Controlled downloads are proxied and audited. Integrity
-checks re-stream canonical bytes and compare a fresh hash without overwriting
-the authoritative hash.
+## Cloud switching
 
-## Validation, review, and approval
-
-Workflow Service uses immutable definition versions and exact Evidence Version
-snapshots to drive:
-
-1. evidence and metadata validation;
-2. human review tasks;
-3. correction cycles;
-4. recommendation submission;
-5. separate approval or rejection;
-6. decision record persistence;
-7. Case Service synchronization.
-
-Four-eyes and separation-of-duties controls are enforced in service
-transactions, not only in the portal.
-
-## AI assessment and governance
-
-The current adapter is deterministic `MockCortexGateway`. It implements the
-governed adapter boundary without inventing a real Cortex API contract.
-
-The service provides:
-
-- controlled runtime profiles and timeout/retry limits;
-- model policies and accepted Evidence classifications/media types;
-- immutable prompt versions and strict output validation;
-- exact pinned Evidence Version citations;
-- persisted work queue, retries, cancellation and failure inspection;
-- human feedback and controlled acceptance into workflow drafts;
-- global processing pause and restoration;
-- a fail-closed production boundary for mock execution.
-
-AI output is decision support only. It cannot submit or approve a credit
-decision.
-
-## Ledger proofs and Fabric
-
-`ledger-service` is the only application service that imports the Fabric
-Gateway SDK or reads the mounted Fabric client identity.
-
-The provider-neutral proof lifecycle is:
-
-```text
-Evidence or decision snapshot
-  → exact content/canonical hash verification
-  → canonical proof envelope
-  → durable ProofRequest
-  → Fabric submission
-  → endorsement and ordering
-  → chaincode proof record
-  → provider binding and CONFIRMED state
-```
-
-Fabric stores proof IDs, evidence/version IDs, opaque organization and case
-scope hashes, content/metadata hashes, version lineage, transaction ID, and
-transaction timestamp. It does not store evidence bytes, filenames, customer
-details, comments, AI output, JWT claims, or human actor details.
-
-Evidence verification reports three independent dimensions:
-
-- off-ledger content hash match;
-- ledger proof confirmation;
-- ledger content hash match.
-
-Retries reuse the stored canonical envelope and proof ID. The chaincode returns
-the existing record for an identical repeated proof and rejects the same proof
-ID with a different payload.
-
-## Data ownership and persistence
-
-| Data                                                        | Authoritative storage               |
-| ----------------------------------------------------------- | ----------------------------------- |
-| Users, roles, permissions and refresh sessions              | Identity PostgreSQL                 |
-| Decision cases, parties and assignments                     | Case PostgreSQL                     |
-| Connector definitions, triggers and checkpoints             | Integration PostgreSQL              |
-| Evidence metadata, versions, scan and access records        | Evidence PostgreSQL                 |
-| Evidence file bytes                                         | Garage quarantine/canonical buckets |
-| Workflow definitions, tasks, recommendations and decisions  | Workflow PostgreSQL                 |
-| Assessments, outputs, governance and operations             | AI PostgreSQL                       |
-| Proof requests, provider bindings and verification attempts | Ledger PostgreSQL                   |
-| Immutable proof anchors                                     | Hyperledger Fabric ledger           |
-| Versioned domain events                                     | Kafka                               |
-
-Application databases and Docker volumes must be backed up using coordinated
-platform procedures. Restoring one database does not replace the need to
-preserve related object-storage and Fabric state.
-
-## Security controls
-
-- RS256 JWT access tokens and JWKS discovery
-- Argon2id password hashing
-- Rotating refresh tokens with reuse detection
-- Tenant and permission checks at every public service boundary
-- Internal service token for controlled service-to-service APIs
-- Idempotency keys and optimistic concurrency
-- Transactional outbox/inbox event delivery
-- Streaming upload limits and content-based media detection
-- Quarantine and malware scanning before evidence availability
-- Immutable evidence and workflow versions
-- Four-eyes approval enforcement
-- AI evidence pinning and strict normalized output
-- Provider-neutral ledger isolation and on-chain data minimization
-- CSP, clickjacking protection, MIME sniffing protection, and restrictive
-  browser permission headers
-
-Production deployments must replace local secrets, disable ephemeral signing
-keys, use secure cookies and TLS, use managed secret references, restrict
-network policies, externalize stateful backups, and operate certificate
-rotation and observability.
-
-## Managed/cloud configuration
-
-Images do not change between local and managed deployments. Supply managed
-endpoints and credentials through environment variables or secret mounts.
-
-The staged GKE manifests, secret bootstrap, deployment order, and Fabric
-readiness gate are documented in
-[`infrastructure/kubernetes/README.md`](infrastructure/kubernetes/README.md).
+Application source and images remain unchanged. Deployment supplies managed
+endpoints and credentials through environment variables:
 
 ```env
-DATABASE_HOST=managed-postgres
-DATABASE_PORT=5432
-DATABASE_USER=cdep_admin
-DATABASE_PASSWORD=secret-reference
-DATABASE_SSL_MODE=require
-IDENTITY_DB_NAME=cdep_identity
-CASE_DB_NAME=cdep_case
-INTEGRATION_DB_NAME=cdep_integration
-EVIDENCE_DB_NAME=cdep_evidence
-WORKFLOW_DB_NAME=cdep_workflow
-AI_DB_NAME=cdep_ai
-LEDGER_DB_NAME=cdep_ledger
-AUDIT_DB_NAME=cdep_audit
+DATABASE_URL=postgresql://service-user:secret@managed-postgres:5432/cdep_identity?sslmode=require
 KAFKA_BROKERS=broker-1:9092,broker-2:9092,broker-3:9092
 KAFKA_SECURITY_PROTOCOL=SASL_SSL
 KAFKA_SASL_MECHANISM=SCRAM-SHA-512
@@ -774,156 +393,19 @@ OBJECT_STORAGE_SECRET_KEY=secret-reference
 CLAMAV_HOST=managed-scanner.internal
 ```
 
-### AlloyDB PostgreSQL
+No service may query another service database directly.
 
-The checked-in AlloyDB template is
-[`infrastructure/kubernetes/alloydb-config.yaml`](infrastructure/kubernetes/alloydb-config.yaml).
-It configures the shared host, port, user, TLS mode, and the eight
-service-specific database names. The password is intentionally not present in
-Git.
+## Current validation
 
-Create or rotate the password Secret from an interactive shell. The password is
-read without echo and is not written into the shell command history:
+- Docker-only end-to-end validation covers arbitrary object/array webhooks,
+  authentication, optional IDs, idempotency/conflicts, extraction failure and
+  replay, SQL read-only connection testing, same-timestamp pagination, durable
+  checkpoints, correlation, manual resolution, and journey events
+- the integration service exposes `/health/live`, `/health/ready`, and
+  Prometheus-format `/metrics`
+- controlled migrations run automatically before each service starts
+- the Phase 3 validator covers real PostgreSQL, Kafka, Garage, and ClamAV
 
-```bash
-kubectl create namespace cdep --dry-run=client -o yaml | kubectl apply -f -
-read -r -s CDEP_ALLOYDB_PASSWORD
-kubectl -n cdep create secret generic alloydb-credentials \
-  --from-literal=DATABASE_PASSWORD="${CDEP_ALLOYDB_PASSWORD}" \
-  --dry-run=client -o yaml | kubectl apply -f -
-unset CDEP_ALLOYDB_PASSWORD
-kubectl apply -f infrastructure/kubernetes/alloydb-config.yaml
-```
-
-Every migration job and database-backed service must import the ConfigMap,
-read the password from the Secret, and build its `DATABASE_URL` with the
-service's own database name. Kubernetes expands environment references in
-declaration order:
-
-```yaml
-envFrom:
-  - configMapRef:
-      name: alloydb-config
-env:
-  - name: DATABASE_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: alloydb-credentials
-        key: DATABASE_PASSWORD
-  - name: DATABASE_URL
-    value: >-
-      postgresql://$(DATABASE_USER):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(IDENTITY_DB_NAME)?sslmode=$(DATABASE_SSL_MODE)
-```
-
-Use the corresponding database-name variable for each workload:
-
-| Workload                      | Database variable     | Database name      |
-| ----------------------------- | --------------------- | ------------------ |
-| Identity Access Service       | `IDENTITY_DB_NAME`    | `cdep_identity`    |
-| Case Service                  | `CASE_DB_NAME`        | `cdep_case`        |
-| Integration Ingestion Service | `INTEGRATION_DB_NAME` | `cdep_integration` |
-| Evidence Service              | `EVIDENCE_DB_NAME`    | `cdep_evidence`    |
-| Validation Workflow Service   | `WORKFLOW_DB_NAME`    | `cdep_workflow`    |
-| AI Assessment Service         | `AI_DB_NAME`          | `cdep_ai`          |
-| Ledger Service                | `LEDGER_DB_NAME`      | `cdep_ledger`      |
-| Audit Query Service           | `AUDIT_DB_NAME`       | `cdep_audit`       |
-
-For Compose-based managed execution, copy `.env.alloydb.example` to a
-non-versioned environment file, populate `DATABASE_PASSWORD` from the secret
-store, and pass it with `--env-file`. Compose constructs all service and
-migration URLs from the shared connection values and the individual
-`*_DB_NAME`.
-
-Before deployment, ensure the GKE workload network can route to the AlloyDB
-address on port `5432`. The database account also needs `CONNECT`, schema
-`USAGE`, schema `CREATE`, and object privileges required by Prisma migrations
-for every listed database.
-
-Fabric client certificates, private keys, and TLS roots must be mounted
-read-only from managed secrets. Never print PEM material, connection profiles,
-refresh tokens, passwords, object-storage credentials, or raw provider errors.
-
-## Troubleshooting
-
-### Gateway is not ready
-
-```bash
-docker compose --profile local ps
-docker compose logs --tail=160 \
-  api-gateway identity-access-service case-service evidence-service \
-  validation-workflow-service ai-assessment-service ledger-service
-```
-
-Readiness remains unavailable until required migrations, seed jobs, storage
-bootstrap, and Fabric lifecycle jobs have completed.
-
-### A service repeatedly restarts
-
-```bash
-docker compose ps -a
-docker compose logs --tail=200 SERVICE_NAME
-docker inspect CONTAINER_NAME
-```
-
-Check unresolved `.env` placeholders, database credentials, port conflicts,
-missing Fabric material, and dependency health.
-
-### Portal is stale after a source change
-
-```bash
-docker compose --profile local build cdep-web-portal
-docker compose --profile local up -d cdep-web-portal
-curl -I http://localhost:8080
-```
-
-### Fabric proof submission is unavailable
-
-```bash
-docker compose --profile fabric ps
-docker compose logs --tail=200 \
-  fabric-peer-cdep fabric-peer-audit fabric-orderer fabric-deploy ledger-service
-curl -fsS http://localhost:3007/health/ready
-```
-
-Existing proof history remains readable from Ledger PostgreSQL during a provider
-outage. Provider-dependent verification and submission remain unavailable until
-Fabric connectivity is restored.
-
-### Start from a clean local environment
-
-This deletes all local application, evidence, and ledger data:
-
-```bash
-docker compose --profile local down -v
-docker compose --profile local build
-docker compose --profile local up -d
-```
-
-## Documentation
-
-- [AI assessment and MockCortex operations](docs/ai-assessment-phase5.md)
-- [Evidence architecture and configuration](docs/evidence-management.md)
-- [Evidence recovery and orphan reconciliation](docs/evidence-recovery-runbook.md)
-- [Integration connectors](docs/integration-connectors.md)
-- [Integration cloud and security configuration](docs/integration-cloud-security.md)
-- [Workflow operations](docs/workflow-phase4.md)
-- [Ledger architecture, Fabric operations and recovery](docs/ledger-phase6.md)
-- [Integration OpenAPI](docs/openapi/integration-phase2b.yaml)
-- [Evidence OpenAPI](docs/openapi/evidence-phase3.yaml)
-- [Workflow OpenAPI](docs/openapi/workflow-phase4.yaml)
-- [AI assessment OpenAPI](docs/openapi/ai-assessment-phase5.yaml)
-- [Ledger OpenAPI](docs/openapi/ledger-phase6.yaml)
-- [Architecture decision records](docs/decisions)
-
-## Operational cautions
-
-- Do not commit `.env`, generated Fabric crypto, database dumps, object-storage
-  data, access tokens, or certificates.
-- Do not use `docker compose down -v` unless permanent local data removal is
-  intended.
-- Do not enable `LEDGER_PROVIDER=GCUL`; it is intentionally unavailable.
-- Do not enable MockCortex execution as a production AI provider.
-- Do not bypass failed tests, four-eyes controls, evidence scanning, or ledger
-  verification states.
-- Do not overwrite historical evidence versions, workflow definitions, decision
-  records, or ledger provider bindings.
+Phase 3 deliberately does not implement business workflow/approval, AI/OCR,
+ledger anchoring, audit search, arbitrary URL retrieval, antivirus-signature
+administration, or physical retention disposal.

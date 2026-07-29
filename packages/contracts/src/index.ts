@@ -480,6 +480,7 @@ export const caseExternalReferenceSchema = z.object({
   createdBy: z.uuid(),
   createdAt: z.iso.datetime(),
 });
+<<<<<<< HEAD
 
 export const auditOutcomeSchema = z.enum([
   "SUCCESS",
@@ -595,3 +596,5 @@ export type AuditSearchResponse = z.infer<typeof auditSearchResponseSchema>;
 export type AuditReportRequest = z.infer<typeof auditReportRequestSchema>;
 export type AuditExportRequest = z.infer<typeof auditExportRequestSchema>;
 export type AuditOperationRequest = z.infer<typeof auditOperationRequestSchema>;
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d

@@ -10,9 +10,15 @@
   "scripts": {
     "build": "npm run build:packages && npm run build:apps",
     "build:packages": "npm run build --workspace @cdep/config && npm run build --workspace @cdep/contracts && npm run build --workspace @cdep/errors",
+<<<<<<< HEAD
     "build:apps": "npm run build --workspace @cdep/identity-access-service && npm run build --workspace @cdep/case-service && npm run build --workspace @cdep/integration-ingestion-service && npm run build --workspace @cdep/evidence-service && npm run build --workspace @cdep/validation-workflow-service && npm run build --workspace @cdep/ai-assessment-service && npm run build --workspace @cdep/ledger-service && npm run build --workspace @cdep/audit-query-service && npm run build --workspace @cdep/api-gateway && npm run build --workspace @cdep/web-portal",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run build:packages && npm run typecheck --workspace @cdep/identity-access-service && npm run typecheck --workspace @cdep/case-service && npm run typecheck --workspace @cdep/integration-ingestion-service && npm run typecheck --workspace @cdep/evidence-service && npm run typecheck --workspace @cdep/validation-workflow-service && npm run typecheck --workspace @cdep/ai-assessment-service && npm run typecheck --workspace @cdep/ledger-service && npm run typecheck --workspace @cdep/audit-query-service && npm run typecheck --workspace @cdep/api-gateway && npm run typecheck --workspace @cdep/web-portal",
+=======
+    "build:apps": "npm run build --workspace @cdep/identity-access-service && npm run build --workspace @cdep/case-service && npm run build --workspace @cdep/integration-ingestion-service && npm run build --workspace @cdep/evidence-service && npm run build --workspace @cdep/validation-workflow-service && npm run build --workspace @cdep/ai-assessment-service && npm run build --workspace @cdep/ledger-service && npm run build --workspace @cdep/api-gateway && npm run build --workspace @cdep/web-portal",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run build:packages && npm run typecheck --workspace @cdep/identity-access-service && npm run typecheck --workspace @cdep/case-service && npm run typecheck --workspace @cdep/integration-ingestion-service && npm run typecheck --workspace @cdep/evidence-service && npm run typecheck --workspace @cdep/validation-workflow-service && npm run typecheck --workspace @cdep/ai-assessment-service && npm run typecheck --workspace @cdep/ledger-service && npm run typecheck --workspace @cdep/api-gateway && npm run typecheck --workspace @cdep/web-portal",
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "infra:up": "docker compose --profile infrastructure up -d",
@@ -27,13 +33,20 @@
     "workflow:db:migrate": "npm run prisma:deploy --workspace @cdep/validation-workflow-service",
     "ai:db:migrate": "npm run prisma:deploy --workspace @cdep/ai-assessment-service",
     "ledger:db:migrate": "npm run prisma:deploy --workspace @cdep/ledger-service",
+<<<<<<< HEAD
     "audit:db:migrate": "npm run prisma:deploy --workspace @cdep/audit-query-service",
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     "validate:phase4": "node scripts/validate-phase4.mjs",
     "validate:phase5": "node scripts/validate-phase5.mjs",
     "validate:phase6": "node scripts/validate-phase6.mjs",
     "validate:phase6.1": "node scripts/validate-phase6.1-v2.mjs",
+<<<<<<< HEAD
     "validate:phase6.1:api": "node scripts/validate-phase6.1.mjs",
     "validate:phase7": "node scripts/validate-phase7.mjs"
+=======
+    "validate:phase6.1:api": "node scripts/validate-phase6.1.mjs"
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   },
   "engines": {
     "node": ">=24.0.0",

@@ -27,7 +27,11 @@ services:
     profiles: [infrastructure, local]
     environment:
       POSTGRES_USER: ${POSTGRES_SUPERUSER:-cdep_admin}
+<<<<<<< HEAD
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-${POSTGRES_SUPERUSER_PASSWORD:?Set DATABASE_PASSWORD or POSTGRES_SUPERUSER_PASSWORD in .env}}
+=======
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Set POSTGRES_SUPERUSER_PASSWORD in .env}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       IDENTITY_DB_USER: ${IDENTITY_DB_USER:-cdep_identity_app}
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}
       IDENTITY_DB_NAME: ${IDENTITY_DB_NAME:-cdep_identity}
@@ -49,9 +53,12 @@ services:
       LEDGER_DB_USER: ${LEDGER_DB_USER:-cdep_ledger_app}
       LEDGER_DB_PASSWORD: ${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}
       LEDGER_DB_NAME: ${LEDGER_DB_NAME:-cdep_ledger}
+<<<<<<< HEAD
       AUDIT_DB_USER: ${AUDIT_DB_USER:-cdep_audit_app}
       AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:-${POSTGRES_SUPERUSER_PASSWORD:?Set AUDIT_DB_PASSWORD or POSTGRES_SUPERUSER_PASSWORD in .env}}
       AUDIT_DB_NAME: ${AUDIT_DB_NAME:-cdep_audit}
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     ports:
       - "5432:5432"
     volumes:
@@ -72,7 +79,11 @@ services:
       PGHOST: postgres
       PGPORT: 5432
       POSTGRES_USER: ${POSTGRES_SUPERUSER:-cdep_admin}
+<<<<<<< HEAD
       PGPASSWORD: ${DATABASE_PASSWORD:-${POSTGRES_SUPERUSER_PASSWORD:?Set DATABASE_PASSWORD or POSTGRES_SUPERUSER_PASSWORD in .env}}
+=======
+      PGPASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Set POSTGRES_SUPERUSER_PASSWORD in .env}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       IDENTITY_DB_USER: ${IDENTITY_DB_USER:-cdep_identity_app}
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}
       IDENTITY_DB_NAME: ${IDENTITY_DB_NAME:-cdep_identity}
@@ -94,9 +105,12 @@ services:
       LEDGER_DB_USER: ${LEDGER_DB_USER:-cdep_ledger_app}
       LEDGER_DB_PASSWORD: ${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}
       LEDGER_DB_NAME: ${LEDGER_DB_NAME:-cdep_ledger}
+<<<<<<< HEAD
       AUDIT_DB_USER: ${AUDIT_DB_USER:-cdep_audit_app}
       AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:-${POSTGRES_SUPERUSER_PASSWORD:?Set AUDIT_DB_PASSWORD or POSTGRES_SUPERUSER_PASSWORD in .env}}
       AUDIT_DB_NAME: ${AUDIT_DB_NAME:-cdep_audit}
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     volumes:
       - ./infrastructure/docker/postgres/00-create-service-databases.sh:/bootstrap.sh:ro
     depends_on:
@@ -143,13 +157,35 @@ services:
       [
         "bash",
         "-ec",
+<<<<<<< HEAD
         'for topic in cdep.case.v1 cdep.integration.lifecycle.v1 cdep.integration.trigger.v1 cdep.evidence.events.v1 cdep.evidence.dlt.v1 cdep.workflow.events.v1 cdep.workflow.dlt.v1 cdep.ai.assessment.v1 cdep.ai.governance.v1 cdep.ai.dlt.v1 cdep.ledger.proof.v1 cdep.ledger.verification.v1 cdep.ledger.dlt.v1 cdep.audit.events.v1 cdep.audit.dlt.v1; do /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --partitions 1 --replication-factor 1 --topic "$$topic"; done',
+=======
+        'for topic in cdep.case.v1 cdep.integration.lifecycle.v1 cdep.integration.trigger.v1 cdep.evidence.events.v1 cdep.evidence.dlt.v1 cdep.workflow.events.v1 cdep.workflow.dlt.v1 cdep.ai.assessment.v1 cdep.ai.governance.v1 cdep.ai.dlt.v1 cdep.ledger.proof.v1 cdep.ledger.verification.v1 cdep.ledger.dlt.v1; do /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --partitions 1 --replication-factor 1 --topic "$$topic"; done',
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       ]
     depends_on:
       kafka:
         condition: service_healthy
     networks: [cdep-network]
 
+<<<<<<< HEAD
+=======
+  redis:
+    image: redis:8.8.0-alpine
+    profiles: [infrastructure, local]
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [cdep-network]
+
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   garage:
     image: dxflrs/garage:v2.3.0
     profiles: [infrastructure, local]
@@ -206,7 +242,11 @@ services:
         "@cdep/identity-access-service",
       ]
     environment:
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${IDENTITY_DB_USER:-cdep_identity_app}}:${DATABASE_PASSWORD:-${IDENTITY_DB_PASSWORD:?Set DATABASE_PASSWORD or IDENTITY_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${IDENTITY_DB_NAME:-cdep_identity}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${IDENTITY_DB_USER:-cdep_identity_app}:${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}@postgres:5432/${IDENTITY_DB_NAME:-cdep_identity}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     depends_on:
       service-database-bootstrap:
         condition: service_completed_successfully
@@ -227,7 +267,11 @@ services:
         "@cdep/identity-access-service",
       ]
     environment:
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${IDENTITY_DB_USER:-cdep_identity_app}}:${DATABASE_PASSWORD:-${IDENTITY_DB_PASSWORD:?Set DATABASE_PASSWORD or IDENTITY_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${IDENTITY_DB_NAME:-cdep_identity}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${IDENTITY_DB_USER:-cdep_identity_app}:${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}@postgres:5432/${IDENTITY_DB_NAME:-cdep_identity}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@cdep.local}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?Set BOOTSTRAP_ADMIN_PASSWORD in .env}
       BOOTSTRAP_ORGANIZATION_NAME: ${BOOTSTRAP_ORGANIZATION_NAME:-CDEP Local Bank}
@@ -248,7 +292,12 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3001
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${IDENTITY_DB_USER:-cdep_identity_app}}:${DATABASE_PASSWORD:-${IDENTITY_DB_PASSWORD:?Set DATABASE_PASSWORD or IDENTITY_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${IDENTITY_DB_NAME:-cdep_identity}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${IDENTITY_DB_USER:-cdep_identity_app}:${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}@postgres:5432/${IDENTITY_DB_NAME:-cdep_identity}
+      REDIS_URL: redis://redis:6379
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       JWT_ISSUER: ${JWT_ISSUER:-cdep-identity-access-service}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-cdep-api}
       JWT_KEY_ID: ${JWT_KEY_ID:-cdep-local-2026-01}
@@ -263,6 +312,11 @@ services:
     depends_on:
       identity-seed:
         condition: service_completed_successfully
+<<<<<<< HEAD
+=======
+      redis:
+        condition: service_healthy
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     ports:
       - "3001:3001"
     healthcheck:
@@ -287,7 +341,11 @@ services:
     command:
       ["npm", "run", "prisma:deploy", "--workspace", "@cdep/case-service"]
     environment:
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${CASE_DB_USER:-cdep_case_app}}:${DATABASE_PASSWORD:-${CASE_DB_PASSWORD:?Set DATABASE_PASSWORD or CASE_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${CASE_DB_NAME:-cdep_case}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${CASE_DB_USER:-cdep_case_app}:${CASE_DB_PASSWORD:?Set CASE_DB_PASSWORD in .env}@postgres:5432/${CASE_DB_NAME:-cdep_case}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     depends_on:
       service-database-bootstrap:
         condition: service_completed_successfully
@@ -300,7 +358,11 @@ services:
     profiles: [local]
     environment:
       PORT: 3002
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${CASE_DB_USER:-cdep_case_app}}:${DATABASE_PASSWORD:-${CASE_DB_PASSWORD:?Set DATABASE_PASSWORD or CASE_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${CASE_DB_NAME:-cdep_case}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${CASE_DB_USER:-cdep_case_app}:${CASE_DB_PASSWORD:?Set CASE_DB_PASSWORD in .env}@postgres:5432/${CASE_DB_NAME:-cdep_case}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       JWT_JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
       JWT_ISSUER: ${JWT_ISSUER:-cdep-identity-access-service}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-cdep-api}
@@ -348,7 +410,11 @@ services:
         "@cdep/integration-ingestion-service",
       ]
     environment:
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${INTEGRATION_DB_USER:-cdep_integration_app}}:${DATABASE_PASSWORD:-${INTEGRATION_DB_PASSWORD:?Set DATABASE_PASSWORD or INTEGRATION_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${INTEGRATION_DB_NAME:-cdep_integration}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${INTEGRATION_DB_USER:-cdep_integration_app}:${INTEGRATION_DB_PASSWORD:?Set INTEGRATION_DB_PASSWORD in .env}@postgres:5432/${INTEGRATION_DB_NAME:-cdep_integration}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     depends_on:
       service-database-bootstrap:
         condition: service_completed_successfully
@@ -361,8 +427,13 @@ services:
     profiles: [local]
     environment:
       PORT: 3003
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${INTEGRATION_DB_USER:-cdep_integration_app}}:${DATABASE_PASSWORD:-${INTEGRATION_DB_PASSWORD:?Set DATABASE_PASSWORD or INTEGRATION_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${INTEGRATION_DB_NAME:-cdep_integration}?sslmode=${DATABASE_SSL_MODE:-disable}
       INTEGRATION_DATABASE_URL: postgresql://${DATABASE_USER:-${INTEGRATION_DB_USER:-cdep_integration_app}}:${DATABASE_PASSWORD:-${INTEGRATION_DB_PASSWORD:?Set DATABASE_PASSWORD or INTEGRATION_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${INTEGRATION_DB_NAME:-cdep_integration}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${INTEGRATION_DB_USER:-cdep_integration_app}:${INTEGRATION_DB_PASSWORD:?Set INTEGRATION_DB_PASSWORD in .env}@postgres:5432/${INTEGRATION_DB_NAME:-cdep_integration}
+      INTEGRATION_DATABASE_URL: postgresql://${INTEGRATION_DB_USER:-cdep_integration_app}:${INTEGRATION_DB_PASSWORD:?Set INTEGRATION_DB_PASSWORD in .env}@postgres:5432/${INTEGRATION_DB_NAME:-cdep_integration}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       JWT_JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
       JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
       JWT_ISSUER: ${JWT_ISSUER:-cdep-identity-access-service}
@@ -416,7 +487,11 @@ services:
     command:
       ["npm", "run", "prisma:deploy", "--workspace", "@cdep/evidence-service"]
     environment:
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${EVIDENCE_DB_USER:-cdep_evidence_app}}:${DATABASE_PASSWORD:-${EVIDENCE_DB_PASSWORD:?Set DATABASE_PASSWORD or EVIDENCE_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${EVIDENCE_DB_NAME:-cdep_evidence}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${EVIDENCE_DB_USER:-cdep_evidence_app}:${EVIDENCE_DB_PASSWORD:?Set EVIDENCE_DB_PASSWORD in .env}@postgres:5432/${EVIDENCE_DB_NAME:-cdep_evidence}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     depends_on:
       service-database-bootstrap:
         condition: service_completed_successfully
@@ -432,8 +507,13 @@ services:
     environment: &evidence-environment
       PORT: 3004
       EVIDENCE_SERVICE_PORT: 3004
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${EVIDENCE_DB_USER:-cdep_evidence_app}}:${DATABASE_PASSWORD:-${EVIDENCE_DB_PASSWORD:?Set DATABASE_PASSWORD or EVIDENCE_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${EVIDENCE_DB_NAME:-cdep_evidence}?sslmode=${DATABASE_SSL_MODE:-disable}
       EVIDENCE_DATABASE_URL: postgresql://${DATABASE_USER:-${EVIDENCE_DB_USER:-cdep_evidence_app}}:${DATABASE_PASSWORD:-${EVIDENCE_DB_PASSWORD:?Set DATABASE_PASSWORD or EVIDENCE_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${EVIDENCE_DB_NAME:-cdep_evidence}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${EVIDENCE_DB_USER:-cdep_evidence_app}:${EVIDENCE_DB_PASSWORD:?Set EVIDENCE_DB_PASSWORD in .env}@postgres:5432/${EVIDENCE_DB_NAME:-cdep_evidence}
+      EVIDENCE_DATABASE_URL: postgresql://${EVIDENCE_DB_USER:-cdep_evidence_app}:${EVIDENCE_DB_PASSWORD:?Set EVIDENCE_DB_PASSWORD in .env}@postgres:5432/${EVIDENCE_DB_NAME:-cdep_evidence}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       CASE_SERVICE_URL: http://case-service:3002
       JWT_JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
       JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
@@ -520,7 +600,11 @@ services:
         "@cdep/validation-workflow-service",
       ]
     environment:
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${WORKFLOW_DB_USER:-cdep_workflow_app}}:${DATABASE_PASSWORD:-${WORKFLOW_DB_PASSWORD:?Set DATABASE_PASSWORD or WORKFLOW_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${WORKFLOW_DB_NAME:-cdep_workflow}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${WORKFLOW_DB_USER:-cdep_workflow_app}:${WORKFLOW_DB_PASSWORD:?Set WORKFLOW_DB_PASSWORD in .env}@postgres:5432/${WORKFLOW_DB_NAME:-cdep_workflow}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     depends_on:
       service-database-bootstrap:
         condition: service_completed_successfully
@@ -535,8 +619,13 @@ services:
       NODE_ENV: development
       PORT: 3005
       WORKFLOW_SERVICE_PORT: 3005
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${WORKFLOW_DB_USER:-cdep_workflow_app}}:${DATABASE_PASSWORD:-${WORKFLOW_DB_PASSWORD:?Set DATABASE_PASSWORD or WORKFLOW_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${WORKFLOW_DB_NAME:-cdep_workflow}?sslmode=${DATABASE_SSL_MODE:-disable}
       WORKFLOW_DATABASE_URL: postgresql://${DATABASE_USER:-${WORKFLOW_DB_USER:-cdep_workflow_app}}:${DATABASE_PASSWORD:-${WORKFLOW_DB_PASSWORD:?Set DATABASE_PASSWORD or WORKFLOW_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${WORKFLOW_DB_NAME:-cdep_workflow}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${WORKFLOW_DB_USER:-cdep_workflow_app}:${WORKFLOW_DB_PASSWORD:?Set WORKFLOW_DB_PASSWORD in .env}@postgres:5432/${WORKFLOW_DB_NAME:-cdep_workflow}
+      WORKFLOW_DATABASE_URL: postgresql://${WORKFLOW_DB_USER:-cdep_workflow_app}:${WORKFLOW_DB_PASSWORD:?Set WORKFLOW_DB_PASSWORD in .env}@postgres:5432/${WORKFLOW_DB_NAME:-cdep_workflow}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       CASE_SERVICE_URL: http://case-service:3002
       EVIDENCE_SERVICE_URL: http://evidence-service:3004
       IDENTITY_SERVICE_URL: http://identity-access-service:3001
@@ -602,7 +691,11 @@ services:
         "@cdep/ai-assessment-service",
       ]
     environment:
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${AI_DB_USER:-cdep_ai_app}}:${DATABASE_PASSWORD:-${AI_DB_PASSWORD:?Set DATABASE_PASSWORD or AI_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${AI_DB_NAME:-cdep_ai}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${AI_DB_USER:-cdep_ai_app}:${AI_DB_PASSWORD:?Set AI_DB_PASSWORD in .env}@postgres:5432/${AI_DB_NAME:-cdep_ai}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     depends_on:
       service-database-bootstrap:
         condition: service_completed_successfully
@@ -616,7 +709,11 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3006
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${AI_DB_USER:-cdep_ai_app}}:${DATABASE_PASSWORD:-${AI_DB_PASSWORD:?Set DATABASE_PASSWORD or AI_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${AI_DB_NAME:-cdep_ai}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${AI_DB_USER:-cdep_ai_app}:${AI_DB_PASSWORD:?Set AI_DB_PASSWORD in .env}@postgres:5432/${AI_DB_NAME:-cdep_ai}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       CASE_SERVICE_URL: http://case-service:3002
       EVIDENCE_SERVICE_URL: http://evidence-service:3004
       WORKFLOW_SERVICE_URL: http://validation-workflow-service:3005
@@ -885,7 +982,11 @@ services:
     command:
       ["npm", "run", "prisma:deploy", "--workspace", "@cdep/ledger-service"]
     environment:
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${LEDGER_DB_USER:-cdep_ledger_app}}:${DATABASE_PASSWORD:-${LEDGER_DB_PASSWORD:?Set DATABASE_PASSWORD or LEDGER_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${LEDGER_DB_NAME:-cdep_ledger}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${LEDGER_DB_USER:-cdep_ledger_app}:${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}@postgres:5432/${LEDGER_DB_NAME:-cdep_ledger}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     depends_on:
       service-database-bootstrap:
         condition: service_completed_successfully
@@ -899,7 +1000,11 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3007
+<<<<<<< HEAD
       DATABASE_URL: postgresql://${DATABASE_USER:-${LEDGER_DB_USER:-cdep_ledger_app}}:${DATABASE_PASSWORD:-${LEDGER_DB_PASSWORD:?Set DATABASE_PASSWORD or LEDGER_DB_PASSWORD in .env}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${LEDGER_DB_NAME:-cdep_ledger}?sslmode=${DATABASE_SSL_MODE:-disable}
+=======
+      DATABASE_URL: postgresql://${LEDGER_DB_USER:-cdep_ledger_app}:${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}@postgres:5432/${LEDGER_DB_NAME:-cdep_ledger}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       LEDGER_PROVIDER: FABRIC
       LEDGER_WORKER_ENABLED: "true"
       LEDGER_WORKER_POLL_INTERVAL_MS: ${LEDGER_WORKER_POLL_INTERVAL_MS:-500}
@@ -957,6 +1062,7 @@ services:
       - "3007:3007"
     networks: [cdep-network]
 
+<<<<<<< HEAD
   audit-migrate:
     build:
       context: .
@@ -1024,6 +1130,8 @@ services:
       - "3008:3008"
     networks: [cdep-network]
 
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   api-gateway:
     build:
       context: .
@@ -1038,11 +1146,18 @@ services:
       WORKFLOW_SERVICE_URL: http://validation-workflow-service:3005
       AI_ASSESSMENT_SERVICE_URL: http://ai-assessment-service:3006
       LEDGER_SERVICE_URL: http://ledger-service:3007
+<<<<<<< HEAD
       AUDIT_SERVICE_URL: http://audit-query-service:3008
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       EVIDENCE_MAX_UPLOAD_BYTES: ${EVIDENCE_MAX_UPLOAD_BYTES:-10485760}
       JWT_JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
       JWT_ISSUER: ${JWT_ISSUER:-cdep-identity-access-service}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-cdep-api}
+<<<<<<< HEAD
+=======
+      REDIS_URL: redis://redis:6379
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     depends_on:
       identity-access-service:
         condition: service_healthy
@@ -1058,8 +1173,11 @@ services:
         condition: service_healthy
       ledger-service:
         condition: service_healthy
+<<<<<<< HEAD
       audit-query-service:
         condition: service_healthy
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     ports:
       - "3000:3000"
     networks: [cdep-network]
@@ -1082,6 +1200,10 @@ networks:
 volumes:
   postgres-data:
   kafka-data:
+<<<<<<< HEAD
+=======
+  redis-data:
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   garage-meta:
   garage-data:
   clamav-data:

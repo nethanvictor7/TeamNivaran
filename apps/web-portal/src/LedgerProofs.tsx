@@ -12,7 +12,10 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+<<<<<<< HEAD
 import { CopyIdentifier } from "./ui";
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 
 type ProofLifecycle = CaseProof["lifecycle"] | null;
 type ProofEligibility = CaseProof["eligibility"];
@@ -421,6 +424,7 @@ export function ProofDetailsDrawer({
           eligibility={proof.eligibility}
           retryable={proof.retryable}
         />
+<<<<<<< HEAD
         <div className="proof-assurance-banner">
           <ShieldCheck size={18} aria-hidden="true" />
           <div>
@@ -454,6 +458,17 @@ export function ProofDetailsDrawer({
               "Pending"
             )}
           </dd>
+=======
+        <dl className="proof-reference-list">
+          <dt>Proof ID</dt>
+          <dd>{proof.proofId}</dd>
+          <dt>Provider</dt>
+          <dd>{proof.provider.providerType}</dd>
+          <dt>Network</dt>
+          <dd>{proof.provider.networkReference ?? "Pending"}</dd>
+          <dt>Contract</dt>
+          <dd>{proof.provider.contractReference ?? "Pending"}</dd>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
           <dt>Requested</dt>
           <dd>{formatLedgerTimestamp(proof.requestedAt)}</dd>
           <dt>Finalized</dt>
@@ -490,7 +505,11 @@ export function ProofDetailsDrawer({
         </div>
         {proof.safeFailureCode && (
           <div className="api-problem">
+<<<<<<< HEAD
             Failure code: {proof.safeFailureCode}
+=======
+            Safe failure code: {proof.safeFailureCode}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
           </div>
         )}
         <h3>Proof history</h3>
@@ -545,8 +564,13 @@ export function RetryProofDialog({
         </div>
         <div className="retry-proof-body">
           <p>
+<<<<<<< HEAD
             Retry sends the same saved proof request again. It will not create a
             duplicate proof or change a confirmed ledger record.
+=======
+            Retry reuses the stored canonical proof envelope. It does not create
+            a second canonical proof or alter confirmed provider data.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
           </p>
           <div className="modal-actions">
             <button

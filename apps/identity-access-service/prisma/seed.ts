@@ -66,6 +66,7 @@ const permissionCodes = [
   "ledger:status:read",
   "ledger:reconcile",
   "audit:read",
+<<<<<<< HEAD
   "audit:search",
   "audit:detail",
   "audit:journey",
@@ -75,6 +76,8 @@ const permissionCodes = [
   "report:run",
   "export:request",
   "artifact:download",
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   "user:manage",
   "role:manage",
   "configuration:manage",
@@ -147,6 +150,7 @@ const roleDefinitions: Record<
       "proof:retry",
       "ledger:status:read",
       "ledger:reconcile",
+<<<<<<< HEAD
       "audit:search",
       "audit:detail",
       "audit:journey",
@@ -155,6 +159,8 @@ const roleDefinitions: Record<
       "report:run",
       "export:request",
       "artifact:download",
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       "user:manage",
       "role:manage",
       "configuration:manage",
@@ -240,6 +246,7 @@ const roleDefinitions: Record<
       "proof:read",
       "ledger:status:read",
       "audit:read",
+<<<<<<< HEAD
       "audit:search",
       "audit:detail",
       "audit:journey",
@@ -247,6 +254,8 @@ const roleDefinitions: Record<
       "report:run",
       "export:request",
       "artifact:download",
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       "integration:source:read",
       "integration:connector:read",
       "integration:trigger:read",

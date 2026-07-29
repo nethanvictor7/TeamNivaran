@@ -4,7 +4,11 @@
 
 Continue the existing CDEP monorepo. Phase 1 already contains the web portal,
 API Gateway, Identity & Access Service, shared contracts, PostgreSQL migration,
+<<<<<<< HEAD
 and Dockerized PostgreSQL/Kafka/Garage/ClamAV.
+=======
+and Dockerized PostgreSQL/Kafka/Redis/Garage/ClamAV.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 
 Core principle:
 

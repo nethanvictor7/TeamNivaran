@@ -302,6 +302,7 @@ export class WorkflowService {
           "The definition version is already immutable.",
         );
       workflowConfigurationSchema.parse(version.configuration);
+<<<<<<< HEAD
       const definition = await tx.workflowDefinition.findUniqueOrThrow({
         where: { id: definitionId },
       });
@@ -319,6 +320,8 @@ export class WorkflowService {
           },
         });
       }
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       const published = await tx.workflowDefinitionVersion.update({
         where: { id: version.id },
         data: {

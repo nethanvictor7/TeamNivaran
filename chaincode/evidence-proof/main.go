@@ -6,7 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+<<<<<<< HEAD
 	"os"
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 	"regexp"
 	"sort"
 	"strings"
@@ -388,6 +391,7 @@ func canonicalSHA256(value any) (string, error) {
 }
 
 func main() {
+<<<<<<< HEAD
 	serverAddress := os.Getenv("CHAINCODE_SERVER_ADDRESS")
 	chaincodeID := os.Getenv("CHAINCODE_ID")
 	if serverAddress != "" || chaincodeID != "" {
@@ -407,6 +411,8 @@ func main() {
 		}
 		return
 	}
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 	if err := shim.Start(&ProofChaincode{}); err != nil {
 		panic(err)
 	}

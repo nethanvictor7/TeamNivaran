@@ -109,15 +109,25 @@ export class MockCortexGateway implements CortexGateway {
     const base: AssessmentOutputContract = {
       schemaVersion: "1.0",
       summary:
+<<<<<<< HEAD
         "This simulated assessment reviewed the current case, workflow and selected evidence. The case still requires a human review.",
+=======
+        "A deterministic mock assessment was completed against the pinned case, workflow, and evidence snapshot. Human review remains mandatory.",
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       recommendation: "REVIEW_REQUIRED",
       confidence: 72,
       findings: [
         {
           code: "HUMAN_REVIEW_REQUIRED",
+<<<<<<< HEAD
           title: "Human review required",
           detail:
             "This result can help organise the review, but it cannot approve or reject the case.",
+=======
+          title: "Controlled review required",
+          detail:
+            "The synthetic assessment is decision support only and does not make or approve a credit decision.",
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
           severity: "MEDIUM",
         },
       ],

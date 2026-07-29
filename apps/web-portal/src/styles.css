@@ -3844,7 +3844,11 @@ tbody tr:hover {
   color: var(--green-900);
 }
 
+<<<<<<< HEAD
 @media (max-width: 1320px) {
+=======
+@media (max-width: 1180px) {
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   .case-register-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -5195,6 +5199,7 @@ tbody tr:hover {
     justify-self: start;
   }
 }
+<<<<<<< HEAD
 
 /* Enterprise operational design system */
 :root {
@@ -10920,3 +10925,5 @@ td {
     transition: none;
   }
 }
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d

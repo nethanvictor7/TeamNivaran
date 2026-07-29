@@ -1,9 +1,24 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+<<<<<<< HEAD
 import { Activity, Cable, Database, History, Plus, X } from "lucide-react";
 import { PermissionGate, useAuth } from "./auth";
 import { ApplicationShell } from "./ApplicationShell";
 import { StatusBadge } from "./ui";
+=======
+import {
+  Activity,
+  BriefcaseBusiness,
+  Cable,
+  Database,
+  History,
+  Landmark,
+  LogOut,
+  Plus,
+  X,
+} from "lucide-react";
+import { PermissionGate, useAuth } from "./auth";
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 
 type Source = {
   id: string;
@@ -51,7 +66,11 @@ type Run = {
 };
 const jsonHeaders = { "content-type": "application/json" };
 
+<<<<<<< HEAD
 export function RevisedIntegrationWorkspace() {
+=======
+export function RevisedIntegrationWorkspace({ onCases }: { onCases(): void }) {
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   const auth = useAuth(),
     client = useQueryClient(),
     [tab, setTab] = useState<"sources" | "triggers" | "runs">("sources"),
@@ -74,6 +93,7 @@ export function RevisedIntegrationWorkspace() {
     enabled: tab === "runs",
   });
   return (
+<<<<<<< HEAD
     <ApplicationShell activeWorkspace="integrations">
       <section className="module-page">
         <div className="module-identity">
@@ -124,6 +144,63 @@ export function RevisedIntegrationWorkspace() {
               eyebrow="Connected systems"
               title="Source systems"
               subtitle="Add a webhook or a read-only PostgreSQL connection."
+=======
+    <div className="app-shell">
+      <aside className="sidebar">
+        <Brand />
+        <p className="nav-label">Workspace</p>
+        <button className="nav-item" onClick={onCases}>
+          <BriefcaseBusiness size={18} />
+          <span>Decision cases</span>
+        </button>
+        <button
+          className={`nav-item ${tab === "sources" ? "nav-item-active" : ""}`}
+          onClick={() => setTab("sources")}
+        >
+          <Cable size={18} />
+          <span>Source systems</span>
+        </button>
+        <button
+          className={`nav-item ${tab === "triggers" ? "nav-item-active" : ""}`}
+          onClick={() => setTab("triggers")}
+        >
+          <Activity size={18} />
+          <span>Trigger monitor</span>
+        </button>
+        <button
+          className={`nav-item ${tab === "runs" ? "nav-item-active" : ""}`}
+          onClick={() => setTab("runs")}
+        >
+          <History size={18} />
+          <span>SQL run history</span>
+        </button>
+        <div className="sidebar-footer">
+          <div className="environment-row">
+            <span className="environment-dot" />
+            Integration operations
+          </div>
+        </div>
+      </aside>
+      <main className="main-content">
+        <header className="topbar glass-panel">
+          <strong>Integration administration</strong>
+          <div className="topbar-actions">
+            <span className="profile-copy">
+              <strong>{auth.identity?.displayName}</strong>
+              <small>{auth.identity?.email}</small>
+            </span>
+            <button className="icon-button" onClick={() => void auth.logout()}>
+              <LogOut size={18} />
+            </button>
+          </div>
+        </header>
+        {tab === "sources" && (
+          <>
+            <Heading
+              eyebrow="Phase 2B · governed inputs"
+              title="Source systems"
+              subtitle="Configure opaque JSON webhooks and read-only PostgreSQL polling."
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
               action={
                 <PermissionGate permission="integration:source:manage">
                   <button
@@ -177,9 +254,15 @@ export function RevisedIntegrationWorkspace() {
         {tab === "triggers" && (
           <>
             <Heading
+<<<<<<< HEAD
               eyebrow="Incoming records"
               title="Incoming activity"
               subtitle="See what arrived, whether it matched a case and what needs attention."
+=======
+              eyebrow="Immutable source inputs"
+              title="Trigger monitor"
+              subtitle="Webhook receipts and SQL rows share one processing pipeline."
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
             />
             <DataCard
               loading={triggers.isLoading}
@@ -223,8 +306,13 @@ export function RevisedIntegrationWorkspace() {
           <>
             <Heading
               eyebrow="Read-only polling"
+<<<<<<< HEAD
               title="Database sync history"
               subtitle="Review each database check, the rows received and any errors."
+=======
+              title="SQL ingestion runs"
+              subtitle="Durable checkpoints advance only after complete trigger capture."
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
             />
             <DataCard
               loading={runs.isLoading}
@@ -263,7 +351,11 @@ export function RevisedIntegrationWorkspace() {
             </DataCard>
           </>
         )}
+<<<<<<< HEAD
       </section>
+=======
+      </main>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       {createSource && (
         <SourceForm
           onClose={() => setCreateSource(false)}
@@ -293,7 +385,24 @@ export function RevisedIntegrationWorkspace() {
           }}
         />
       )}
+<<<<<<< HEAD
     </ApplicationShell>
+=======
+    </div>
+  );
+}
+function Brand() {
+  return (
+    <div className="brand">
+      <span className="brand-mark">
+        <Landmark size={22} />
+      </span>
+      <div>
+        <div className="brand-name">CDEP</div>
+        <div className="brand-caption">Decision Evidence</div>
+      </div>
+    </div>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   );
 }
 function Heading({
@@ -319,7 +428,17 @@ function Heading({
   );
 }
 function Status({ value }: { value: string }) {
+<<<<<<< HEAD
   return <StatusBadge value={value} />;
+=======
+  return (
+    <span
+      className={`status ${["ACTIVE", "READY", "PUBLISHED", "SUCCEEDED"].includes(value) ? "status-green" : ""}`}
+    >
+      {value}
+    </span>
+  );
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 }
 function DataCard({
   loading,
@@ -337,7 +456,11 @@ function DataCard({
   return (
     <section className="card work-queue">
       {loading ? (
+<<<<<<< HEAD
         <div className="empty-state">Loading records…</div>
+=======
+        <div className="empty-state">Loading controlled records…</div>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       ) : error ? (
         <div className="api-problem">{error.message}</div>
       ) : empty ? (
@@ -364,7 +487,11 @@ function SourceForm({
   return (
     <Modal
       title="Create source system"
+<<<<<<< HEAD
       eyebrow="New connection"
+=======
+      eyebrow="Governed source catalog"
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       onClose={onClose}
     >
       <form
@@ -792,7 +919,11 @@ function ConnectorPanel({
             </select>
           </label>
           <label>
+<<<<<<< HEAD
             Source field path
+=======
+            Safe JSONPath
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
             <input value={path} onChange={(e) => setPath(e.target.value)} />
           </label>
           <label>
@@ -930,7 +1061,11 @@ function TriggerPanel({
         </div>
         <div className="control-row">
           <span>Source record</span>
+<<<<<<< HEAD
           <strong>{trigger.sourceRecordId || "Generated by Aegis"}</strong>
+=======
+          <strong>{trigger.sourceRecordId || "Generated by CDEP"}</strong>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
         </div>
       </div>
       {["UNMATCHED", "AMBIGUOUS_CORRELATION"].includes(trigger.status) && (
@@ -940,7 +1075,11 @@ function TriggerPanel({
             <input
               value={caseId}
               onChange={(e) => setCaseId(e.target.value)}
+<<<<<<< HEAD
               placeholder="Decision case ID"
+=======
+              placeholder="Decision Case UUID"
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
             />
             <input
               value={reason}

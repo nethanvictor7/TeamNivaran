@@ -11,6 +11,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+<<<<<<< HEAD
 import {
   Blocks,
   CheckCircle2,
@@ -21,6 +22,9 @@ import {
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
+=======
+import { Fingerprint, RefreshCw, ShieldCheck } from "lucide-react";
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 import { useRef, useState } from "react";
 import type { ZodType } from "zod";
 import { useAuth } from "./auth";
@@ -328,7 +332,11 @@ export function CaseLedgerSummary({
         <p>
           {summary
             ? `${summary.evidenceCounts.confirmed} of ${summary.evidenceCounts.eligible} current Evidence Versions confirmed`
+<<<<<<< HEAD
             : "Loading proof status…"}
+=======
+            : "Reading the case-scoped proof projection…"}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
         </p>
       </div>
       <div className="case-panel-actions">
@@ -345,6 +353,7 @@ export function CaseLedgerSummary({
   );
 }
 
+<<<<<<< HEAD
 function LedgerTrustStrip({ summary }: { summary: CaseLedgerSummaryData }) {
   const network =
     summary.latestConfirmed?.provider.networkReference ?? "Not bound";
@@ -495,6 +504,8 @@ function IndependentVerification({
   );
 }
 
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
   const auth = useAuth();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -541,11 +552,19 @@ export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
     <section className="card case-page-panel case-ledger-tab">
       <div className="case-panel-header">
         <div>
+<<<<<<< HEAD
           <p className="eyebrow">Case proof</p>
           <h2>Ledger & verification</h2>
           <p>
             Confirm evidence and final decisions on the ledger, then verify that
             each proof still matches the case record.
+=======
+          <p className="eyebrow">Provider-neutral proof view</p>
+          <h2>Ledger & Verification</h2>
+          <p>
+            Case-level anchoring, provider references, lifecycle, and
+            independent verification results.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
           </p>
         </div>
         <button
@@ -565,13 +584,23 @@ export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
       )}
       {ledger.partial && (
         <div className="api-warning" role="status">
+<<<<<<< HEAD
           Some ledger information could not be loaded. Refresh to try again.
+=======
+          Partial ledger data is available. Refresh to recover the missing
+          projection.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
         </div>
       )}
       {ledger.stale && (
         <div className="api-warning" role="status">
+<<<<<<< HEAD
           This ledger information may be out of date. The last verified data is
           shown while Aegis refreshes it.
+=======
+          The last trustworthy ledger projection is stale. Displayed proof data
+          is retained while a refresh is attempted.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
         </div>
       )}
       <LedgerAvailabilityNotice summary={summary} />
@@ -582,7 +611,10 @@ export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
       )}
       {summary && (
         <>
+<<<<<<< HEAD
           <LedgerTrustStrip summary={summary} />
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
           <div className="ledger-metric-grid">
             <div>
               <span>Case proof state</span>
@@ -615,6 +647,7 @@ export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
             onAnchor={() => void ledger.anchorDecision()}
             onOpen={(proof) => setSelectedId(proof.proofRequestId)}
           />
+<<<<<<< HEAD
           <IndependentVerification
             summary={summary}
             canVerify={ledger.canVerify}
@@ -628,23 +661,36 @@ export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
                 <p>
                   See which evidence versions have a confirmed ledger proof.
                 </p>
+=======
+          <section>
+            <div className="evidence-section-heading">
+              <div>
+                <h3>Current Evidence Versions</h3>
+                <p>One case-scoped projection; no per-row ledger requests.</p>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
               </div>
             </div>
             <div className="ledger-evidence-grid">
               {summary.evidenceTargets.map((target) => {
                 const proof = byVersion.get(target.evidenceVersionId);
                 return (
+<<<<<<< HEAD
                   <article
                     className="ledger-evidence-row"
                     key={target.evidenceVersionId}
                   >
                     <div className="ledger-evidence-identity">
+=======
+                  <article key={target.evidenceVersionId}>
+                    <div>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                       <strong>{target.classificationCode}</strong>
                       <CopyIdentifier
                         value={target.evidenceVersionId}
                         prefix="Version"
                       />
                     </div>
+<<<<<<< HEAD
                     <div className="ledger-evidence-actions">
                       <EvidenceProofStatus
                         lifecycle={target.lifecycle}
@@ -675,23 +721,65 @@ export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
                         />
                       )}
                     </div>
+=======
+                    <EvidenceProofStatus
+                      lifecycle={target.lifecycle}
+                      eligibility={target.eligibility}
+                      retryable={proof?.retryable}
+                      onOpen={
+                        proof
+                          ? () => setSelectedId(proof.proofRequestId)
+                          : undefined
+                      }
+                    />
+                    {!proof && ledger.canCreate && (
+                      <AnchorProofButton
+                        busy={ledger.busy}
+                        disabled={!summary.ledgerAvailability.available}
+                        disabledReason={
+                          !summary.ledgerAvailability.available
+                            ? "The configured ledger provider is unavailable."
+                            : undefined
+                        }
+                        label="Anchor"
+                        onClick={() =>
+                          void ledger.anchorEvidence(
+                            target.evidenceId,
+                            target.evidenceVersionId,
+                          )
+                        }
+                      />
+                    )}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                   </article>
                 );
               })}
               {!summary.evidenceTargets.length && (
                 <div className="empty-state">
+<<<<<<< HEAD
                   No evidence version is ready to anchor.
+=======
+                  No available Evidence Version is eligible for anchoring.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                 </div>
               )}
             </div>
           </section>
         </>
       )}
+<<<<<<< HEAD
       <section className="ledger-history-section">
         <div className="evidence-section-heading">
           <div>
             <h3>Proof history</h3>
             <p>All proof requests for this case, newest first.</p>
+=======
+      <section>
+        <div className="evidence-section-heading">
+          <div>
+            <h3>Proof history</h3>
+            <p>Stable newest-first proof requests for this case.</p>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
           </div>
           <div className="ledger-filters" aria-label="Proof history filters">
             <SelectField
@@ -716,6 +804,7 @@ export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
             </SelectField>
           </div>
         </div>
+<<<<<<< HEAD
         <div className="proof-history-head" aria-hidden="true">
           <span>Proof type</span>
           <span>Requested at (UTC)</span>
@@ -723,6 +812,8 @@ export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
           <span>Provider</span>
           <span>Action</span>
         </div>
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
         <div className="proof-list">
           {filtered.map((proof) => (
             <button
@@ -821,7 +912,11 @@ function TransactionDetails({ proof }: { proof: CaseProof | null }) {
   if (transaction.isLoading)
     return (
       <div className="transaction-detail-state" role="status">
+<<<<<<< HEAD
         Loading transaction details…
+=======
+        Loading authoritative transaction state…
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       </div>
     );
   if (transaction.isError)

@@ -15,6 +15,10 @@ import {
   Fingerprint,
   History,
   Gavel,
+<<<<<<< HEAD
+=======
+  Landmark,
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   LogOut,
   Menu,
   PencilLine,
@@ -44,9 +48,12 @@ import {
   type CaseSection,
 } from "./routing";
 import { SelectField, StatusBadge } from "./ui";
+<<<<<<< HEAD
 import { ApplicationShell } from "./ApplicationShell";
 import { AuditWorkspace } from "./Audit";
 import { LandingPage } from "./LandingPage";
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 
 type Party = { id: string; partyType: string; displayName: string };
 type Assignment = { id: string; userId: string; role: string };
@@ -78,6 +85,10 @@ type CaseList = {
   total: number;
   totalPages: number;
 };
+<<<<<<< HEAD
+=======
+type Login = { email: string; password: string };
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 type NewCase = {
   title: string;
   caseType: string;
@@ -183,10 +194,75 @@ export function App() {
         </div>
       </div>
     );
+<<<<<<< HEAD
   if (!auth.identity) return <LandingPage />;
   return <CaseWorkspace />;
 }
 
+=======
+  if (!auth.identity) return <LoginScreen />;
+  return <CaseWorkspace />;
+}
+
+function LoginScreen() {
+  const auth = useAuth();
+  const {
+    register,
+    handleSubmit,
+    formState: { isSubmitting },
+  } = useForm<Login>();
+  const [error, setError] = useState("");
+  return (
+    <main className="auth-screen">
+      <section className="login-card">
+        <div className="login-brand">
+          <span className="brand-mark">
+            <Landmark size={24} />
+          </span>
+          <div>
+            <h1>CDEP</h1>
+            <p>Decision Evidence</p>
+          </div>
+        </div>
+        <h2>Sign in to your workspace</h2>
+        <p>Use your controlled CDEP identity.</p>
+        <form
+          onSubmit={handleSubmit(async (data) => {
+            setError("");
+            try {
+              await auth.login(data.email, data.password);
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Login failed.");
+            }
+          })}
+        >
+          <label>
+            Email
+            <input
+              type="email"
+              autoComplete="username"
+              {...register("email", { required: true })}
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              autoComplete="current-password"
+              {...register("password", { required: true, minLength: 12 })}
+            />
+          </label>
+          {error && <div className="api-problem">{error}</div>}
+          <button className="primary-button" disabled={isSubmitting}>
+            {isSubmitting ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
+      </section>
+    </main>
+  );
+}
+
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 function CaseWorkspace() {
   const auth = useAuth();
   const client = useQueryClient();
@@ -196,6 +272,12 @@ function CaseWorkspace() {
   const [selected, setSelected] = useState<Case | null>(null);
   const [routeError, setRouteError] = useState("");
   const [routeLoading, setRouteLoading] = useState(Boolean(route.caseId));
+<<<<<<< HEAD
+=======
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const sidebar = useRef<HTMLElement>(null);
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   useEffect(() => {
     if (location.pathname === "/" || location.hash.startsWith("#case=")) {
       const initial = parsePortalRoute(location);
@@ -210,6 +292,10 @@ function CaseWorkspace() {
       const next = parsePortalRoute(location);
       setRoute(next);
       setSearch(next.search);
+<<<<<<< HEAD
+=======
+      setMobileNavOpen(false);
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     };
     addEventListener("popstate", sync);
     return () => removeEventListener("popstate", sync);
@@ -286,6 +372,42 @@ function CaseWorkspace() {
     route.workspace,
     search,
   ]);
+<<<<<<< HEAD
+=======
+  useEffect(() => {
+    if (!mobileNavOpen || !sidebar.current) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const root = sidebar.current;
+    root.querySelector<HTMLElement>("button")?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileNavOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    root.addEventListener("keydown", onKeyDown);
+    return () => {
+      root.removeEventListener("keydown", onKeyDown);
+      (previous ?? menuButton.current)?.focus();
+    };
+  }, [mobileNavOpen]);
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   const query = useQuery({
     queryKey: ["cases", search, route.status, route.priority, route.page],
     queryFn: async ({ signal }) => {
@@ -346,6 +468,7 @@ function CaseWorkspace() {
     navigate(`/cases${params.size ? `?${params}` : ""}`);
   }
   if (route.workspace === "integrations")
+<<<<<<< HEAD
     return <RevisedIntegrationWorkspace />;
   if (route.workspace === "workflow") return <WorkflowOperations />;
   if (route.workspace === "audit")
@@ -653,6 +776,413 @@ function CaseWorkspace() {
           </section>
         </>
       )}
+=======
+    return <RevisedIntegrationWorkspace onCases={() => navigate("/cases")} />;
+  if (route.workspace === "workflow")
+    return <WorkflowOperations onCases={() => navigate("/cases")} />;
+  return (
+    <div className="app-shell">
+      {mobileNavOpen && (
+        <button
+          type="button"
+          className="mobile-overlay"
+          onClick={() => setMobileNavOpen(false)}
+          aria-label="Close navigation"
+        />
+      )}
+      <aside
+        ref={sidebar}
+        className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}
+        aria-label="Primary navigation"
+      >
+        <div className="brand">
+          <span className="brand-mark">
+            <Landmark size={22} />
+          </span>
+          <div>
+            <div className="brand-name">CDEP</div>
+            <div className="brand-caption">Decision Evidence</div>
+          </div>
+          <button
+            type="button"
+            className="icon-button mobile-close"
+            onClick={() => setMobileNavOpen(false)}
+            aria-label="Close navigation"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <p className="nav-label">Workspace</p>
+        <button
+          type="button"
+          className={`nav-item ${route.workspace === "cases" ? "nav-item-active" : ""}`}
+          aria-current={route.workspace === "cases" ? "page" : undefined}
+          onClick={() => navigate("/cases")}
+        >
+          <BriefcaseBusiness size={18} />
+          <span>Decision cases</span>
+        </button>
+        <PermissionGate permission="integration:source:read">
+          <button
+            type="button"
+            className="nav-item"
+            onClick={() => navigate("/integrations")}
+          >
+            <Cable size={18} />
+            <span>Integrations</span>
+          </button>
+        </PermissionGate>
+        <PermissionGate permission="workflow:task:read">
+          <button
+            type="button"
+            className="nav-item"
+            onClick={() => navigate("/workflow")}
+          >
+            <Gavel size={18} />
+            <span>Workflow queue</span>
+          </button>
+        </PermissionGate>
+        <PermissionGate permission="ai-governance:read">
+          <button
+            type="button"
+            className={`nav-item ${route.workspace === "ai-governance" ? "nav-item-active" : ""}`}
+            aria-current={
+              route.workspace === "ai-governance" ? "page" : undefined
+            }
+            onClick={() => navigate("/ai-governance")}
+          >
+            <BrainCircuit size={18} />
+            <span>AI governance</span>
+          </button>
+        </PermissionGate>
+        <div className="sidebar-footer">
+          <div className="environment-row">
+            <span className="environment-dot" />
+            Controlled environment
+          </div>
+        </div>
+      </aside>
+      <main className="main-content">
+        <header className="topbar glass-panel">
+          <button
+            ref={menuButton}
+            type="button"
+            className="icon-button menu-button"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open navigation"
+            aria-expanded={mobileNavOpen}
+          >
+            <Menu size={19} />
+          </button>
+          <strong className="cockpit-title">Operations cockpit</strong>
+          <div className="topbar-actions">
+            <span className="profile-copy">
+              <strong>{auth.identity?.displayName}</strong>
+              <small>{auth.identity?.email}</small>
+            </span>
+            <button
+              className="icon-button"
+              onClick={() => void auth.logout()}
+              aria-label="Sign out"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
+        </header>
+        {route.workspace === "ai-governance" ? (
+          <AiGovernanceWorkspace />
+        ) : routeLoading ? (
+          <div className="card empty-state" role="status">
+            Loading case…
+          </div>
+        ) : routeError ? (
+          <section className="card safe-route-state" role="alert">
+            <h1>Case unavailable</h1>
+            <p>{routeError}</p>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => navigate("/cases")}
+            >
+              Back to case register
+            </button>
+          </section>
+        ) : selected ? (
+          <CaseDetailPage
+            item={selected}
+            section={route.section}
+            onBack={() =>
+              navigate(
+                `/cases${search ? `?search=${encodeURIComponent(search)}` : ""}`,
+              )
+            }
+          />
+        ) : (
+          <>
+            <section className="page-heading case-register-page-heading">
+              <div>
+                <h1>Decision cases</h1>
+                <p className="page-subtitle">
+                  Create and manage tenant-scoped credit decision records.
+                </p>
+              </div>
+              <PermissionGate permission="case:create">
+                <button
+                  className="primary-button"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus size={18} />
+                  New decision case
+                </button>
+              </PermissionGate>
+            </section>
+            <section
+              className="card case-register-metrics"
+              aria-label="Decision case totals"
+              aria-busy={caseMetrics.isLoading}
+            >
+              <CaseRegisterMetric
+                icon={BriefcaseBusiness}
+                label="Total"
+                value={caseMetrics.data?.total ?? null}
+                description="All decision cases"
+                tone="green"
+              />
+              <CaseRegisterMetric
+                icon={Eye}
+                label="Under review"
+                value={caseMetrics.data?.underReview ?? null}
+                description="Risk and readiness"
+                tone="blue"
+              />
+              <CaseRegisterMetric
+                icon={CircleAlert}
+                label="Awaiting action"
+                value={caseMetrics.data?.awaitingAction ?? null}
+                description="Decision pending"
+                tone="amber"
+              />
+              <CaseRegisterMetric
+                icon={ShieldCheck}
+                label="Decided"
+                value={caseMetrics.data?.decided ?? null}
+                description="Finalised decisions"
+                tone="emerald"
+              />
+            </section>
+            {caseMetrics.isError && (
+              <div className="api-warning" role="status">
+                Summary totals are temporarily unavailable. The case register
+                remains current and usable.
+              </div>
+            )}
+            <section className="card work-queue">
+              <div className="case-register-controls">
+                <label className="case-register-search">
+                  <span className="sr-only">Search decision cases</span>
+                  <Search size={18} aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search cases"
+                  />
+                </label>
+                <SelectField
+                  label="Status"
+                  hideLabel
+                  value={route.status}
+                  onChange={(event) =>
+                    updateCaseFilters({
+                      status: event.target.value,
+                      page: 1,
+                    })
+                  }
+                >
+                  <option value="">All statuses</option>
+                  <option>DRAFT</option>
+                  <option>OPEN</option>
+                  <option>EVIDENCE_COLLECTION</option>
+                  <option>UNDER_REVIEW</option>
+                  <option>DECISION_PENDING</option>
+                  <option>DECIDED</option>
+                  <option>CLOSED</option>
+                  <option>CANCELLED</option>
+                </SelectField>
+                <SelectField
+                  label="Priority"
+                  hideLabel
+                  value={route.priority}
+                  onChange={(event) =>
+                    updateCaseFilters({
+                      priority: event.target.value,
+                      page: 1,
+                    })
+                  }
+                >
+                  <option value="">All priorities</option>
+                  <option>LOW</option>
+                  <option>NORMAL</option>
+                  <option>HIGH</option>
+                  <option>URGENT</option>
+                </SelectField>
+                {(route.status || route.priority || search) && (
+                  <button
+                    type="button"
+                    className="secondary-button case-clear-filters"
+                    onClick={() => {
+                      setSearch("");
+                      navigate("/cases");
+                    }}
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+              {query.isLoading ? (
+                <div className="empty-state">Loading decision cases…</div>
+              ) : query.isError ? (
+                <div className="api-problem">{query.error.message}</div>
+              ) : query.data?.items.length === 0 ? (
+                <div className="empty-state">No decision cases found.</div>
+              ) : (
+                <>
+                  <div className="table-wrap">
+                    <table className="case-register-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Case</th>
+                          <th scope="col">Type</th>
+                          <th scope="col">Priority</th>
+                          <th scope="col">Stage</th>
+                          <th scope="col">Status</th>
+                          <th scope="col">Amount</th>
+                          <th scope="col">Updated</th>
+                          <th scope="col">
+                            <span className="sr-only">Open case</span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {query.data?.items.map((item) => {
+                          const stage = caseStagePresentation(item.status);
+                          return (
+                            <tr key={item.id}>
+                              <td>
+                                <button
+                                  className="case-link"
+                                  onClick={() => openCase(item)}
+                                >
+                                  <strong>{item.title}</strong>
+                                  <span>{item.caseNumber}</span>
+                                </button>
+                              </td>
+                              <td className="case-type-cell">
+                                {item.caseType.replaceAll("_", " ")}
+                              </td>
+                              <td>
+                                <StatusBadge value={item.priority} />
+                              </td>
+                              <td>
+                                <span className="case-stage">
+                                  <strong>{stage.stage}</strong>
+                                  <small>{stage.description}</small>
+                                </span>
+                              </td>
+                              <td>
+                                <StatusBadge value={item.status} />
+                              </td>
+                              <td className="case-amount-cell">
+                                {item.requestedAmountMinor == null
+                                  ? "Not recorded"
+                                  : `${item.currency} ${(item.requestedAmountMinor / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+                              </td>
+                              <td className="case-updated-cell">
+                                {new Date(item.updatedAt).toLocaleString(
+                                  undefined,
+                                  {
+                                    dateStyle: "short",
+                                    timeStyle: "short",
+                                  },
+                                )}
+                              </td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="row-action"
+                                  onClick={() => openCase(item)}
+                                  aria-label={`Open ${item.caseNumber}`}
+                                >
+                                  <ChevronRight size={17} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="pagination">
+                    <span className="pagination-summary">
+                      {query.data!.total} records · {query.data!.pageSize} per
+                      page
+                    </span>
+                    <div
+                      className="pagination-controls"
+                      aria-label="Case register pages"
+                    >
+                      <button
+                        type="button"
+                        className="icon-button"
+                        disabled={query.data!.page <= 1}
+                        onClick={() =>
+                          updateCaseFilters({ page: query.data!.page - 1 })
+                        }
+                        aria-label="Previous page"
+                      >
+                        <ChevronLeft size={17} />
+                      </button>
+                      {[
+                        query.data!.page - 1,
+                        query.data!.page,
+                        query.data!.page + 1,
+                      ]
+                        .filter(
+                          (page) => page >= 1 && page <= query.data!.totalPages,
+                        )
+                        .map((page) => (
+                          <button
+                            type="button"
+                            key={page}
+                            className={`pagination-page ${page === query.data!.page ? "pagination-page-active" : ""}`}
+                            aria-current={
+                              page === query.data!.page ? "page" : undefined
+                            }
+                            onClick={() => updateCaseFilters({ page })}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      <button
+                        type="button"
+                        className="icon-button"
+                        disabled={query.data!.page >= query.data!.totalPages}
+                        onClick={() =>
+                          updateCaseFilters({ page: query.data!.page + 1 })
+                        }
+                        aria-label="Next page"
+                      >
+                        <ChevronRight size={17} />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </section>
+          </>
+        )}
+      </main>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       {createOpen && (
         <CreateCase
           onClose={() => setCreateOpen(false)}
@@ -665,7 +1195,11 @@ function CaseWorkspace() {
           }}
         />
       )}
+<<<<<<< HEAD
     </ApplicationShell>
+=======
+    </div>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   );
 }
 
@@ -724,11 +1258,19 @@ function IntegrationWorkspace({ onCases }: { onCases(): void }) {
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-mark">
+<<<<<<< HEAD
             <ShieldCheck size={22} />
           </span>
           <div>
             <div className="brand-name">Aegis</div>
             <div className="brand-caption">Decision Evidence Vault</div>
+=======
+            <Landmark size={22} />
+          </span>
+          <div>
+            <div className="brand-name">CDEP</div>
+            <div className="brand-caption">Decision Evidence</div>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
           </div>
         </div>
         <p className="nav-label">Workspace</p>
@@ -776,11 +1318,19 @@ function IntegrationWorkspace({ onCases }: { onCases(): void }) {
           <>
             <section className="page-heading">
               <div>
+<<<<<<< HEAD
                 <p className="eyebrow">Source setup</p>
                 <h1>Source systems</h1>
                 <p className="page-subtitle">
                   Add the systems that send records to Aegis and manage their
                   connections.
+=======
+                <p className="eyebrow">Phase 2B · Source integration</p>
+                <h1>Source systems</h1>
+                <p className="page-subtitle">
+                  Configure governed inbound adapters, credentials and
+                  activation.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                 </p>
               </div>
               <PermissionGate permission="integration:source:manage">
@@ -854,11 +1404,19 @@ function IntegrationWorkspace({ onCases }: { onCases(): void }) {
           <>
             <section className="page-heading">
               <div>
+<<<<<<< HEAD
                 <p className="eyebrow">Source activity</p>
                 <h1>Incoming records</h1>
                 <p className="page-subtitle">
                   See what Aegis received, when it arrived and whether it was
                   matched to a case.
+=======
+                <p className="eyebrow">Operational visibility</p>
+                <h1>Raw event monitor</h1>
+                <p className="page-subtitle">
+                  Immutable, tenant-scoped ingestion receipts with redacted
+                  payload access.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                 </p>
               </div>
             </section>
@@ -950,7 +1508,11 @@ function CreateSource({
       <section className="modal-card">
         <div className="modal-header">
           <div>
+<<<<<<< HEAD
             <p className="eyebrow">New source</p>
+=======
+            <p className="eyebrow">Governed configuration</p>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
             <h2>Create source system</h2>
           </div>
           <button className="icon-button" onClick={onClose}>
@@ -1233,7 +1795,11 @@ function CreateCase({
       <section className="modal-card" role="dialog" aria-modal="true">
         <div className="modal-header">
           <div>
+<<<<<<< HEAD
             <p className="eyebrow">New case</p>
+=======
+            <p className="eyebrow">Controlled initiation</p>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
             <h2>Create decision case</h2>
           </div>
           <button className="icon-button" onClick={onClose}>
@@ -1289,8 +1855,12 @@ function CreateCase({
           {error && <div className="api-problem">{error}</div>}
           <div className="modal-note">
             <ShieldCheck size={18} />
+<<<<<<< HEAD
             Only users with the right permission can create a case. The action
             is added to the case history.
+=======
+            Creation is permission-controlled and audit recorded.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
           </div>
           <div className="modal-actions">
             <button
@@ -1506,11 +2076,19 @@ function CaseDetailPage({
               <section className="card case-page-panel overview-record-card">
                 <div className="case-panel-header">
                   <div>
+<<<<<<< HEAD
                     <p className="eyebrow">Case information</p>
                     <h2>Case details</h2>
                     <p>
                       Update the case title or priority here. Status changes
                       follow the case workflow.
+=======
+                    <p className="eyebrow">Controlled record</p>
+                    <h2>Case details</h2>
+                    <p>
+                      Update the governed record without leaving the operational
+                      overview.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                     </p>
                   </div>
                 </div>
@@ -1597,9 +2175,15 @@ function CaseDetailPage({
               <section className="card overview-snapshot-card">
                 <div className="case-panel-header">
                   <div>
+<<<<<<< HEAD
                     <p className="eyebrow">At a glance</p>
                     <h2>Case summary</h2>
                     <p>Current information for this case.</p>
+=======
+                    <p className="eyebrow">Operational snapshot</p>
+                    <h2>Record readiness</h2>
+                    <p>Facts from the current tenant-scoped case record.</p>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                   </div>
                   <ShieldCheck size={22} aria-hidden="true" />
                 </div>
@@ -1639,7 +2223,13 @@ function CaseDetailPage({
                   <div>
                     <p className="eyebrow">Case operations</p>
                     <h2>Workspaces</h2>
+<<<<<<< HEAD
                     <p>Choose the area you want to work in.</p>
+=======
+                    <p>
+                      Open a focused operation without a multi-purpose dialog.
+                    </p>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                   </div>
                 </div>
                 <div className="overview-workspace-links">
@@ -1649,7 +2239,11 @@ function CaseDetailPage({
                     [
                       "assessment",
                       "AI assessment",
+<<<<<<< HEAD
                       "Findings for human review",
+=======
+                      "Governed decision support",
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                     ],
                     ["ledger", "Ledger", "Proofs and verification"],
                   ].map(([target, label, description]) => (
@@ -1735,7 +2329,11 @@ function CaseDetailPage({
                 <div>
                   <h2>Case assignments</h2>
                   <p>
+<<<<<<< HEAD
                     People responsible for working on or reviewing this case.
+=======
+                    Ownership and operational responsibilities for this case.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                   </p>
                 </div>
               </div>
@@ -1766,7 +2364,11 @@ function CaseDetailPage({
                 <PermissionGate permission="case:assign">
                   <div className="inline-form">
                     <input
+<<<<<<< HEAD
                       placeholder="User ID"
+=======
+                      placeholder="Stable user UUID"
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                       value={assignee}
                       onChange={(e) => setAssignee(e.target.value)}
                     />
@@ -1848,9 +2450,13 @@ function CaseDetailPage({
               <div className="case-panel-header">
                 <div>
                   <h2>Case activity</h2>
+<<<<<<< HEAD
                   <p>
                     Status changes and records received from connected systems.
                   </p>
+=======
+                  <p>Status history and linked source-system journey.</p>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                 </div>
               </div>
               <div className="detail-section case-activity-section">
@@ -1867,7 +2473,11 @@ function CaseDetailPage({
               </div>
               <PermissionGate permission="integration:journey:read">
                 <div className="detail-section">
+<<<<<<< HEAD
                   <h3>Source activity</h3>
+=======
+                  <h3>Source decision journey</h3>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                   {journey.isLoading ? (
                     <p className="muted-cell">Loading integration journey…</p>
                   ) : journey.data?.length ? (
@@ -1884,7 +2494,11 @@ function CaseDetailPage({
                     ))
                   ) : (
                     <p className="muted-cell">
+<<<<<<< HEAD
                       No source records are linked to this case.
+=======
+                      No source triggers are linked to this case.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                     </p>
                   )}
                 </div>

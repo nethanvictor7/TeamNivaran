@@ -157,6 +157,7 @@ const [admin, reviewer, approver, outsider] = await Promise.all([
 ]);
 
 await request("/api/v1/workflow/tasks", { expected: [401] });
+<<<<<<< HEAD
 const manualDefinition = await request("/api/v1/workflow-definitions", {
   method: "POST",
   expected: [201],
@@ -217,6 +218,8 @@ await request(
   `/api/v1/workflow-definitions/${manualDefinition.id}/versions/${manualDefinitionVersion.id}/publish`,
   { method: "POST", expected: [201], token: admin, json: {} },
 );
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 const primary = await createReadyCase(admin, `${suffix}-primary`);
 const startKey = `phase4-start-${suffix}`;
 const started = await request(
@@ -226,7 +229,11 @@ const started = await request(
     expected: [201],
     token: admin,
     headers: { "idempotency-key": startKey },
+<<<<<<< HEAD
     json: { definitionVersionId: manualDefinitionVersion.id },
+=======
+    json: {},
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   },
 );
 const duplicateStart = await request(
@@ -236,7 +243,11 @@ const duplicateStart = await request(
     expected: [201],
     token: admin,
     headers: { "idempotency-key": startKey },
+<<<<<<< HEAD
     json: { definitionVersionId: manualDefinitionVersion.id },
+=======
+    json: {},
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   },
 );
 assert.equal(

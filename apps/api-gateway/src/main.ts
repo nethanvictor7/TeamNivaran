@@ -195,7 +195,10 @@ fastify.get("/health/ready", async (_request, reply) => {
       workflow,
       aiAssessment,
       ledger,
+<<<<<<< HEAD
       audit,
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     ] = await Promise.all([
       fetch(`${environment.IDENTITY_SERVICE_URL}/health/ready`, {
         signal: AbortSignal.timeout(2_000),
@@ -218,9 +221,12 @@ fastify.get("/health/ready", async (_request, reply) => {
       fetch(`${environment.LEDGER_SERVICE_URL}/health/ready`, {
         signal: AbortSignal.timeout(3_000),
       }),
+<<<<<<< HEAD
       fetch(`${environment.AUDIT_SERVICE_URL}/health/ready`, {
         signal: AbortSignal.timeout(3_000),
       }),
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     ]);
     if (
       !identity.ok ||
@@ -229,8 +235,12 @@ fastify.get("/health/ready", async (_request, reply) => {
       !evidence.ok ||
       !workflow.ok ||
       !aiAssessment.ok ||
+<<<<<<< HEAD
       !ledger.ok ||
       !audit.ok
+=======
+      !ledger.ok
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     ) {
       throw new Error("A gateway dependency is unavailable.");
     }
@@ -244,7 +254,10 @@ fastify.get("/health/ready", async (_request, reply) => {
         workflowService: "up",
         aiAssessmentService: "up",
         ledgerService: "up",
+<<<<<<< HEAD
         auditQueryService: "up",
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       },
     };
   } catch {
@@ -258,7 +271,10 @@ fastify.get("/health/ready", async (_request, reply) => {
         workflowService: "unknown",
         aiAssessmentService: "unknown",
         ledgerService: "unknown",
+<<<<<<< HEAD
         auditQueryService: "unknown",
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
       },
     });
   }
@@ -271,6 +287,7 @@ await fastify.register(httpProxy, {
   http2: false,
 });
 
+<<<<<<< HEAD
 await fastify.register(httpProxy, {
   upstream: environment.AUDIT_SERVICE_URL,
   prefix: "/api/v1/audit",
@@ -293,6 +310,8 @@ await fastify.register(httpProxy, {
   },
 });
 
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 const ledgerProxy = async (request: FastifyRequest, reply: FastifyReply) => {
   try {
     return await reply.from(`${environment.LEDGER_SERVICE_URL}${request.url}`);

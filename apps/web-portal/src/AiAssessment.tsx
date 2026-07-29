@@ -1,4 +1,8 @@
 import {
+<<<<<<< HEAD
+=======
+  Activity,
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
   AlertTriangle,
   ArrowLeft,
   BrainCircuit,
@@ -121,6 +125,7 @@ type RuntimeTestResult = {
   warning?: string;
 };
 
+<<<<<<< HEAD
 const legacyAssessmentCopy: Record<string, string> = {
   "Controlled human review support": "Support human review",
   "A deterministic mock assessment was completed against the pinned case, workflow, and evidence snapshot. Human review remains mandatory.":
@@ -135,6 +140,8 @@ function assessmentText(value: string | undefined) {
   return legacyAssessmentCopy[value] ?? value;
 }
 
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
 export function formatGovernanceBytes(value: number) {
   if (value >= 1024 * 1024)
     return `${(value / (1024 * 1024)).toFixed(value % (1024 * 1024) ? 1 : 0)} MB`;
@@ -264,11 +271,19 @@ export function AiAssessmentPanel({ caseId }: { caseId: string }) {
       <section className="card case-page-panel ai-assessment-register">
         <div className="case-panel-header">
           <div>
+<<<<<<< HEAD
             <p className="eyebrow">AI-assisted review</p>
             <h2>AI assessments</h2>
             <p>
               A configured assessment profile reviews the selected evidence. It
               can suggest findings, but only a person can decide the case.
+=======
+            <p className="eyebrow">Decision support · Human controlled</p>
+            <h2>AI assessments</h2>
+            <p>
+              Deterministic mock inference over exact, pinned Evidence versions.
+              It cannot submit or approve a decision.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
             </p>
           </div>
           <BrainCircuit size={25} />
@@ -286,7 +301,11 @@ export function AiAssessmentPanel({ caseId }: { caseId: string }) {
                   `/api/v1/cases/${caseId}/ai-assessments`,
                   {
                     modelPolicyId: "50000000-0000-4000-8000-000000000004",
+<<<<<<< HEAD
                     purpose: "Support human review",
+=======
+                    purpose: "Controlled human review support",
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                     expectedWorkflowVersion: currentWorkflow?.rowVersion,
                   },
                   true,
@@ -298,7 +317,11 @@ export function AiAssessmentPanel({ caseId }: { caseId: string }) {
             </button>
             {!currentWorkflow && (
               <small id="assessment-request-help">
+<<<<<<< HEAD
                 Start the case workflow before requesting an assessment.
+=======
+                An active Workflow is required before requesting an assessment.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
               </small>
             )}
           </span>
@@ -314,7 +337,11 @@ export function AiAssessmentPanel({ caseId }: { caseId: string }) {
                 onClick={() => setSelectedId(item.id)}
               >
                 <span>
+<<<<<<< HEAD
                   <strong>{assessmentText(item.purpose)}</strong>
+=======
+                  <strong>{item.purpose}</strong>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                   <small>{new Date(item.requestedAt).toLocaleString()}</small>
                 </span>
                 <StatusBadge value={item.status} />
@@ -363,8 +390,13 @@ export function AiAssessmentPanel({ caseId }: { caseId: string }) {
               <>
                 <div className="ai-result-summary">
                   <strong>{output.recommendation.replaceAll("_", " ")}</strong>
+<<<<<<< HEAD
                   <span>{output.confidence}% assessment confidence</span>
                   <p>{assessmentText(output.summary)}</p>
+=======
+                  <span>{output.confidence}% synthetic confidence</span>
+                  <p>{output.summary}</p>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                 </div>
                 {[
                   ["Findings", output.findings],
@@ -376,6 +408,7 @@ export function AiAssessmentPanel({ caseId }: { caseId: string }) {
                     {(items as OutputItem[]).length ? (
                       (items as OutputItem[]).map((item) => (
                         <div className="control-row" key={item.code}>
+<<<<<<< HEAD
                           <span>
                             {assessmentText(item.title ?? item.label)}
                           </span>
@@ -383,6 +416,11 @@ export function AiAssessmentPanel({ caseId }: { caseId: string }) {
                           {item.detail && (
                             <small>{assessmentText(item.detail)}</small>
                           )}
+=======
+                          <span>{item.title ?? item.label}</span>
+                          <strong>{item.code}</strong>
+                          {item.detail && <small>{item.detail}</small>}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                         </div>
                       ))
                     ) : (
@@ -393,8 +431,13 @@ export function AiAssessmentPanel({ caseId }: { caseId: string }) {
                 <div className="ai-human-boundary">
                   <ShieldAlert size={18} />
                   <p>
+<<<<<<< HEAD
                     Adding a finding creates a draft for review. A person must
                     still check and submit it.
+=======
+                    Accepting selected items only creates a Workflow draft with
+                    provenance. A human must still review and submit it.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                   </p>
                 </div>
                 <div className="case-panel-actions">
@@ -439,7 +482,11 @@ export function AiAssessmentPanel({ caseId }: { caseId: string }) {
                         )
                       }
                     >
+<<<<<<< HEAD
                       Add first finding to draft
+=======
+                      Accept first finding to draft
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                     </button>
                   </PermissionGate>
                 </div>
@@ -453,10 +500,17 @@ export function AiAssessmentPanel({ caseId }: { caseId: string }) {
                 {["FAILED", "INVALID_OUTPUT", "POLICY_BLOCKED"].includes(
                   detail.data.status,
                 )
+<<<<<<< HEAD
                   ? "This assessment did not produce a result."
                   : detail.data.status === "CANCELLED"
                     ? "This assessment was cancelled before an output was produced."
                     : "The assessment is still running. Results will appear here when it completes."}
+=======
+                  ? "No assessment output is available for this terminal state."
+                  : detail.data.status === "CANCELLED"
+                    ? "This assessment was cancelled before an output was produced."
+                    : "The assessment is still processing. Results will appear here when validation completes."}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
               </div>
             )}
             {[
@@ -482,7 +536,11 @@ export function AiAssessmentPanel({ caseId }: { caseId: string }) {
               </PermissionGate>
             )}
             <div className="detail-section">
+<<<<<<< HEAD
               <h3>Evidence used</h3>
+=======
+              <h3>Pinned Evidence</h3>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
               <div className="assessment-evidence-list">
                 {detail.data.refs.map((ref) => (
                   <div
@@ -499,7 +557,11 @@ export function AiAssessmentPanel({ caseId }: { caseId: string }) {
                 ))}
                 {!detail.data.refs.length && (
                   <div className="empty-state compact-empty">
+<<<<<<< HEAD
                     No evidence versions were selected.
+=======
+                    No Evidence versions were pinned.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                   </div>
                 )}
               </div>
@@ -623,7 +685,11 @@ export function AiGovernanceWorkspace() {
       }
       const result = (await response.json()) as RuntimeTestResult;
       setRuntimeTest(result);
+<<<<<<< HEAD
       setMessage(`${runtime.code} completed its test successfully.`);
+=======
+      setMessage(`${runtime.code} completed its deterministic self-test.`);
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
     } catch (cause) {
       setMessage(
         cause instanceof Error
@@ -702,6 +768,7 @@ export function AiGovernanceWorkspace() {
               </span>
               <div>
                 <h1 id="governance-title">AI governance</h1>
+<<<<<<< HEAD
                 <p>
                   Policies, runtime profiles and safeguards for AI-assisted
                   review.
@@ -709,6 +776,12 @@ export function AiGovernanceWorkspace() {
               </div>
               <StatusBadge
                 value={globallyPaused ? "PROCESSING PAUSED" : "ACTIVE"}
+=======
+                <p>Controlled decision support</p>
+              </div>
+              <StatusBadge
+                value={globallyPaused ? "PROCESSING PAUSED" : "CONTROLLED"}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                 tone={globallyPaused ? "danger" : "success"}
               />
             </header>
@@ -765,6 +838,45 @@ export function AiGovernanceWorkspace() {
             </section>
 
             <div className="ai-governance-dashboard">
+<<<<<<< HEAD
+=======
+              <aside className="card ai-adapter-panel">
+                <div className="ai-panel-title">
+                  <Activity size={18} />
+                  <h2>Adapter boundary</h2>
+                </div>
+                <dl>
+                  <div>
+                    <dt>Active adapter</dt>
+                    <dd>
+                      <StatusBadge value={query.data.adapterMode} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Live Cortex integration</dt>
+                    <dd className="ai-warning-value">
+                      {query.data.liveCortex.replaceAll("_", " ")}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Runtime profiles</dt>
+                    <dd>{activeRuntimes} active</dd>
+                  </div>
+                  <div>
+                    <dt>Platform boundary</dt>
+                    <dd>Human decision required</dd>
+                  </div>
+                </dl>
+                <button
+                  type="button"
+                  className="ai-text-action"
+                  onClick={() => setView("runtimes")}
+                >
+                  View runtime profiles <ChevronRight size={15} />
+                </button>
+              </aside>
+
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
               <section className="card ai-policy-register">
                 <header className="ai-panel-header">
                   <div>
@@ -823,12 +935,16 @@ export function AiGovernanceWorkspace() {
                             <button
                               type="button"
                               className="ai-table-select"
+<<<<<<< HEAD
                               title={policy.code}
+=======
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                               onClick={() => setSelectedPolicyId(policy.id)}
                             >
                               {policy.code}
                             </button>
                           </td>
+<<<<<<< HEAD
                           <td>
                             <span
                               className="ai-table-value"
@@ -848,6 +964,12 @@ export function AiGovernanceWorkspace() {
                               {runtimeById.get(policy.runtimeConfigId)?.code ??
                                 "Unavailable"}
                             </span>
+=======
+                          <td>{policy.purpose}</td>
+                          <td>
+                            {runtimeById.get(policy.runtimeConfigId)?.code ??
+                              "Unavailable"}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                           </td>
                           <td>
                             <StatusBadge
@@ -855,11 +977,15 @@ export function AiGovernanceWorkspace() {
                             />
                           </td>
                           <td>
+<<<<<<< HEAD
                             <span className="ai-table-value">
                               {policy.organizationId
                                 ? "Organization"
                                 : "Global"}
                             </span>
+=======
+                            {policy.organizationId ? "Organization" : "Global"}
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                           </td>
                         </tr>
                       ))}
@@ -914,7 +1040,11 @@ export function AiGovernanceWorkspace() {
                       </div>
                     </dl>
                     <div className="ai-policy-rules">
+<<<<<<< HEAD
                       <h3>Permitted evidence</h3>
+=======
+                      <h3>Permitted Evidence</h3>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                       <div>
                         {selectedPolicy.allowedClassifications.map((value) => (
                           <span key={value}>{value.replaceAll("_", " ")}</span>
@@ -957,9 +1087,13 @@ export function AiGovernanceWorkspace() {
               </button>
               <div>
                 <h1 id="governance-title">Runtime profiles</h1>
+<<<<<<< HEAD
                 <p>
                   Configure how assessments run, time out and handle failures.
                 </p>
+=======
+                <p>Deterministic execution</p>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
               </div>
             </header>
 
@@ -1040,7 +1174,11 @@ export function AiGovernanceWorkspace() {
                       {!query.data.runtimeConfigs.length && (
                         <tr>
                           <td colSpan={6} className="muted-cell">
+<<<<<<< HEAD
                             No runtime profiles are configured.
+=======
+                            No deterministic runtime profiles are configured.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                           </td>
                         </tr>
                       )}
@@ -1063,7 +1201,11 @@ export function AiGovernanceWorkspace() {
                     </span>
                     <div>
                       <h2>Runtime profile details</h2>
+<<<<<<< HEAD
                       <p>Settings, limits and test results</p>
+=======
+                      <p>Deterministic configuration and testing</p>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                     </div>
                   </div>
                   {selectedRuntime ? (
@@ -1121,10 +1263,17 @@ export function AiGovernanceWorkspace() {
                         </div>
                       </dl>
                       <div className="ai-runtime-test">
+<<<<<<< HEAD
                         <h3>Test profile</h3>
                         <p>
                           Run this profile on its own to confirm that it is
                           working as expected.
+=======
+                        <h3>Test action</h3>
+                        <p>
+                          Run this profile in isolation to verify deterministic
+                          execution.
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                         </p>
                         <PermissionGate permission="ai-governance:test">
                           <button
@@ -1187,7 +1336,11 @@ export function AiGovernanceWorkspace() {
                     </div>
                     <div>
                       <dt>Control scope</dt>
+<<<<<<< HEAD
                       <dd>Organisation</dd>
+=======
+                      <dd>Organization</dd>
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
                     </div>
                   </dl>
                   <div className="ai-emergency-warning">
@@ -1229,7 +1382,11 @@ export function AiGovernanceWorkspace() {
       <ConfirmationDialog
         open={confirmPause}
         title="Pause all assessment processing?"
+<<<<<<< HEAD
         description="This stops new assessments across the organisation until an authorised operator restores processing. Existing decisions and assessment results will not change."
+=======
+        description="This blocks new assessment work across the organization until an authorized operator restores processing. Existing human decisions and stored assessment results are not changed."
+>>>>>>> 952b6244f78c00b3e453e46683833a97e8a1919d
         confirmLabel="Enable global pause"
         busy={busy}
         onCancel={() => setConfirmPause(false)}
