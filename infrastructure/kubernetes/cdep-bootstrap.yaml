@@ -11,6 +11,7 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      enableServiceLinks: false
       imagePullSecrets:
         - name: gitlab-registry
       containers:
@@ -48,6 +49,7 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      enableServiceLinks: false
       imagePullSecrets:
         - name: gitlab-registry
       initContainers:
@@ -69,6 +71,8 @@ spec:
                 name: cdep-runtime-config
           env:
             - name: PORT
+              value: "3004"
+            - name: EVIDENCE_SERVICE_PORT
               value: "3004"
             - name: DATABASE_URL
               valueFrom:

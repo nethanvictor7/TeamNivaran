@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { CopyIdentifier } from "./ui";
 
 type ProofLifecycle = CaseProof["lifecycle"] | null;
 type ProofEligibility = CaseProof["eligibility"];
@@ -420,15 +421,39 @@ export function ProofDetailsDrawer({
           eligibility={proof.eligibility}
           retryable={proof.retryable}
         />
+        <div className="proof-assurance-banner">
+          <ShieldCheck size={18} aria-hidden="true" />
+          <div>
+            <strong>Confirmed ledger record</strong>
+            <span>
+              References below are shown exactly as they were returned by the
+              ledger provider.
+            </span>
+          </div>
+        </div>
         <dl className="proof-reference-list">
           <dt>Proof ID</dt>
-          <dd>{proof.proofId}</dd>
+          <dd>
+            <CopyIdentifier value={proof.proofId} />
+          </dd>
           <dt>Provider</dt>
           <dd>{proof.provider.providerType}</dd>
           <dt>Network</dt>
-          <dd>{proof.provider.networkReference ?? "Pending"}</dd>
+          <dd>
+            {proof.provider.networkReference ? (
+              <CopyIdentifier value={proof.provider.networkReference} />
+            ) : (
+              "Pending"
+            )}
+          </dd>
           <dt>Contract</dt>
-          <dd>{proof.provider.contractReference ?? "Pending"}</dd>
+          <dd>
+            {proof.provider.contractReference ? (
+              <CopyIdentifier value={proof.provider.contractReference} />
+            ) : (
+              "Pending"
+            )}
+          </dd>
           <dt>Requested</dt>
           <dd>{formatLedgerTimestamp(proof.requestedAt)}</dd>
           <dt>Finalized</dt>
@@ -465,7 +490,7 @@ export function ProofDetailsDrawer({
         </div>
         {proof.safeFailureCode && (
           <div className="api-problem">
-            Safe failure code: {proof.safeFailureCode}
+            Failure code: {proof.safeFailureCode}
           </div>
         )}
         <h3>Proof history</h3>
@@ -520,8 +545,8 @@ export function RetryProofDialog({
         </div>
         <div className="retry-proof-body">
           <p>
-            Retry reuses the stored canonical proof envelope. It does not create
-            a second canonical proof or alter confirmed provider data.
+            Retry sends the same saved proof request again. It will not create a
+            duplicate proof or change a confirmed ledger record.
           </p>
           <div className="modal-actions">
             <button

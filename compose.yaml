@@ -49,6 +49,9 @@ services:
       LEDGER_DB_USER: ${LEDGER_DB_USER:-cdep_ledger_app}
       LEDGER_DB_PASSWORD: ${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}
       LEDGER_DB_NAME: ${LEDGER_DB_NAME:-cdep_ledger}
+      AUDIT_DB_USER: ${AUDIT_DB_USER:-cdep_audit_app}
+      AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:-${POSTGRES_SUPERUSER_PASSWORD:?Set AUDIT_DB_PASSWORD or POSTGRES_SUPERUSER_PASSWORD in .env}}
+      AUDIT_DB_NAME: ${AUDIT_DB_NAME:-cdep_audit}
     ports:
       - "5432:5432"
     volumes:
@@ -91,6 +94,9 @@ services:
       LEDGER_DB_USER: ${LEDGER_DB_USER:-cdep_ledger_app}
       LEDGER_DB_PASSWORD: ${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}
       LEDGER_DB_NAME: ${LEDGER_DB_NAME:-cdep_ledger}
+      AUDIT_DB_USER: ${AUDIT_DB_USER:-cdep_audit_app}
+      AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:-${POSTGRES_SUPERUSER_PASSWORD:?Set AUDIT_DB_PASSWORD or POSTGRES_SUPERUSER_PASSWORD in .env}}
+      AUDIT_DB_NAME: ${AUDIT_DB_NAME:-cdep_audit}
     volumes:
       - ./infrastructure/docker/postgres/00-create-service-databases.sh:/bootstrap.sh:ro
     depends_on:
@@ -137,7 +143,7 @@ services:
       [
         "bash",
         "-ec",
-        'for topic in cdep.case.v1 cdep.integration.lifecycle.v1 cdep.integration.trigger.v1 cdep.evidence.events.v1 cdep.evidence.dlt.v1 cdep.workflow.events.v1 cdep.workflow.dlt.v1 cdep.ai.assessment.v1 cdep.ai.governance.v1 cdep.ai.dlt.v1 cdep.ledger.proof.v1 cdep.ledger.verification.v1 cdep.ledger.dlt.v1; do /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --partitions 1 --replication-factor 1 --topic "$$topic"; done',
+        'for topic in cdep.case.v1 cdep.integration.lifecycle.v1 cdep.integration.trigger.v1 cdep.evidence.events.v1 cdep.evidence.dlt.v1 cdep.workflow.events.v1 cdep.workflow.dlt.v1 cdep.ai.assessment.v1 cdep.ai.governance.v1 cdep.ai.dlt.v1 cdep.ledger.proof.v1 cdep.ledger.verification.v1 cdep.ledger.dlt.v1 cdep.audit.events.v1 cdep.audit.dlt.v1; do /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --partitions 1 --replication-factor 1 --topic "$$topic"; done',
       ]
     depends_on:
       kafka:
@@ -951,6 +957,73 @@ services:
       - "3007:3007"
     networks: [cdep-network]
 
+  audit-migrate:
+    build:
+      context: .
+      dockerfile: apps/audit-query-service/Dockerfile
+      target: build
+    profiles: [local]
+    command:
+      [
+        "npm",
+        "run",
+        "prisma:deploy",
+        "--workspace",
+        "@cdep/audit-query-service",
+      ]
+    environment:
+      DATABASE_URL: postgresql://${DATABASE_USER:-${AUDIT_DB_USER:-cdep_audit_app}}:${DATABASE_PASSWORD:-${AUDIT_DB_PASSWORD:-${POSTGRES_SUPERUSER_PASSWORD:?Set AUDIT_DB_PASSWORD or POSTGRES_SUPERUSER_PASSWORD in .env}}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${AUDIT_DB_NAME:-cdep_audit}?sslmode=${DATABASE_SSL_MODE:-disable}
+    depends_on:
+      service-database-bootstrap:
+        condition: service_completed_successfully
+    networks: [cdep-network]
+
+  audit-query-service:
+    build:
+      context: .
+      dockerfile: apps/audit-query-service/Dockerfile
+    profiles: [local]
+    environment:
+      NODE_ENV: development
+      PORT: 3008
+      DATABASE_URL: postgresql://${DATABASE_USER:-${AUDIT_DB_USER:-cdep_audit_app}}:${DATABASE_PASSWORD:-${AUDIT_DB_PASSWORD:-${POSTGRES_SUPERUSER_PASSWORD:?Set AUDIT_DB_PASSWORD or POSTGRES_SUPERUSER_PASSWORD in .env}}}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${AUDIT_DB_NAME:-cdep_audit}?sslmode=${DATABASE_SSL_MODE:-disable}
+      CURSOR_SIGNING_SECRET: ${AUDIT_CURSOR_SIGNING_SECRET:-cdep-local-audit-cursor-signing-secret-2026}
+      KAFKA_ENABLED: "true"
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: cdep-audit-query-service
+      KAFKA_GROUP_ID: cdep-audit-authority-v2
+      KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      OBJECT_STORAGE_ENDPOINT: http://garage:3900
+      OBJECT_STORAGE_PUBLIC_ENDPOINT: http://localhost:3900
+      OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-cdep-local}
+      OBJECT_STORAGE_FORCE_PATH_STYLE: "true"
+      OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:?Set OBJECT_STORAGE_ACCESS_KEY in .env}
+      OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:?Set OBJECT_STORAGE_SECRET_KEY in .env}
+      OBJECT_STORAGE_AUDIT_BUCKET: ${OBJECT_STORAGE_AUDIT_BUCKET:-cdep-audit-artifacts}
+      ARTIFACT_RETENTION_HOURS: ${AUDIT_ARTIFACT_RETENTION_HOURS:-168}
+    depends_on:
+      audit-migrate:
+        condition: service_completed_successfully
+      kafka-topic-bootstrap:
+        condition: service_completed_successfully
+      garage:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3008/health/ready').then(r=>r.json()).then(v=>{if(v.status!=='ok')process.exit(1)})",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    ports:
+      - "3008:3008"
+    networks: [cdep-network]
+
   api-gateway:
     build:
       context: .
@@ -965,6 +1038,7 @@ services:
       WORKFLOW_SERVICE_URL: http://validation-workflow-service:3005
       AI_ASSESSMENT_SERVICE_URL: http://ai-assessment-service:3006
       LEDGER_SERVICE_URL: http://ledger-service:3007
+      AUDIT_SERVICE_URL: http://audit-query-service:3008
       EVIDENCE_MAX_UPLOAD_BYTES: ${EVIDENCE_MAX_UPLOAD_BYTES:-10485760}
       JWT_JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
       JWT_ISSUER: ${JWT_ISSUER:-cdep-identity-access-service}
@@ -983,6 +1057,8 @@ services:
       ai-assessment-service:
         condition: service_healthy
       ledger-service:
+        condition: service_healthy
+      audit-query-service:
         condition: service_healthy
     ports:
       - "3000:3000"

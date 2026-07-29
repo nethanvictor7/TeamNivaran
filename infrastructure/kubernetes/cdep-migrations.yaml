@@ -221,3 +221,50 @@ spec:
                 secretKeyRef:
                   name: cdep-database-urls
                   key: LEDGER_DATABASE_URL
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: audit-migrate
+  namespace: cdep
+  labels:
+    app.kubernetes.io/name: audit-migrate
+    app.kubernetes.io/part-of: cdep
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: gitlab-registry
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: registry.gitlab.com/reboot4443731/cdep/audit-query-service:latest
+          imagePullPolicy: Always
+          command:
+            - ./node_modules/.bin/prisma
+            - migrate
+            - deploy
+            - --schema
+            - apps/audit-query-service/prisma/schema.prisma
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cdep-database-urls
+                  key: AUDIT_DATABASE_URL
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi

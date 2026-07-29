@@ -11,7 +11,16 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Fingerprint, RefreshCw, ShieldCheck } from "lucide-react";
+import {
+  Blocks,
+  CheckCircle2,
+  Clock3,
+  Fingerprint,
+  Network,
+  RefreshCw,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import type { ZodType } from "zod";
 import { useAuth } from "./auth";
@@ -319,7 +328,7 @@ export function CaseLedgerSummary({
         <p>
           {summary
             ? `${summary.evidenceCounts.confirmed} of ${summary.evidenceCounts.eligible} current Evidence Versions confirmed`
-            : "Reading the case-scoped proof projection…"}
+            : "Loading proof status…"}
         </p>
       </div>
       <div className="case-panel-actions">
@@ -333,6 +342,156 @@ export function CaseLedgerSummary({
         </button>
       </div>
     </section>
+  );
+}
+
+function LedgerTrustStrip({ summary }: { summary: CaseLedgerSummaryData }) {
+  const network =
+    summary.latestConfirmed?.provider.networkReference ?? "Not bound";
+  const items = [
+    {
+      label: "Case proof",
+      value: summary.state.replaceAll("_", " "),
+      icon: ShieldCheck,
+      healthy: !["FAILED", "MISMATCH"].includes(summary.state),
+    },
+    {
+      label: "Evidence coverage",
+      value: `${summary.evidenceCounts.confirmed}/${summary.evidenceCounts.eligible} confirmed`,
+      icon: CheckCircle2,
+      healthy:
+        summary.evidenceCounts.eligible > 0 &&
+        summary.evidenceCounts.confirmed === summary.evidenceCounts.eligible,
+    },
+    {
+      label: "Provider",
+      value: summary.ledgerAvailability.providerType,
+      icon: Blocks,
+      healthy: summary.ledgerAvailability.available,
+    },
+    {
+      label: "Network / channel",
+      value: network,
+      icon: Network,
+      healthy: network !== "Not bound",
+    },
+    {
+      label: "Fresh as of",
+      value: formatLedgerTimestamp(summary.freshness.generatedAt),
+      icon: Clock3,
+      healthy: Date.parse(summary.freshness.staleAfter) >= Date.now(),
+    },
+  ];
+  return (
+    <section className="ledger-trust-strip" aria-label="Ledger trust status">
+      {items.map(({ label, value, icon: Icon, healthy }) => (
+        <div
+          key={label}
+          className={
+            healthy ? "ledger-trust-positive" : "ledger-trust-attention"
+          }
+        >
+          <span className="ledger-trust-icon" aria-hidden="true">
+            <Icon size={19} />
+          </span>
+          <span>
+            <small>{label}</small>
+            <strong>{value}</strong>
+          </span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function IndependentVerification({
+  summary,
+  canVerify,
+  busy,
+  onVerify,
+}: {
+  summary: CaseLedgerSummaryData;
+  canVerify: boolean;
+  busy: boolean;
+  onVerify(proof: CaseProof): void;
+}) {
+  const verification = summary.latestVerification;
+  const latest = summary.latestConfirmed;
+  const checks = verification
+    ? [
+        {
+          label: "Transaction finalized",
+          value: verification.providerState === "FINALIZED",
+        },
+        {
+          label: "Transaction exists on ledger",
+          value: verification.ledgerConfirmation === "CONFIRMED",
+        },
+        {
+          label: "Off-ledger content hash matches",
+          value: verification.offLedgerHash === "MATCH",
+        },
+        {
+          label: "Anchored ledger hash matches",
+          value: verification.ledgerHash === "MATCH",
+        },
+      ]
+    : [];
+  return (
+    <aside className="ledger-assurance-card">
+      <div className="ledger-assurance-heading">
+        <span className="ledger-assurance-icon" aria-hidden="true">
+          <ShieldCheck size={22} />
+        </span>
+        <div>
+          <p className="eyebrow">Independent verification</p>
+          <h3>Proof checks</h3>
+          <p>
+            These checks compare the stored evidence with the confirmed ledger
+            record.
+          </p>
+        </div>
+      </div>
+      {verification ? (
+        <>
+          <ul className="ledger-assurance-list">
+            {checks.map((check) => (
+              <li key={check.label}>
+                {check.value ? (
+                  <CheckCircle2 size={16} aria-hidden="true" />
+                ) : (
+                  <TriangleAlert size={16} aria-hidden="true" />
+                )}
+                <span>{check.label}</span>
+                <strong>{check.value ? "Pass" : "Attention"}</strong>
+              </li>
+            ))}
+          </ul>
+          <div className="ledger-assurance-footer">
+            <span>
+              Last verified
+              <strong>{formatLedgerTimestamp(verification.verifiedAt)}</strong>
+            </span>
+            {canVerify && latest && (
+              <button
+                type="button"
+                className="primary-button"
+                disabled={busy || !summary.ledgerAvailability.available}
+                onClick={() => onVerify(latest)}
+              >
+                <RefreshCw size={16} />
+                {busy ? "Verifying…" : "Verify latest proof"}
+              </button>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="ledger-assurance-empty">
+          <TriangleAlert size={18} aria-hidden="true" />
+          No independent verification has been recorded for the latest proof.
+        </div>
+      )}
+    </aside>
   );
 }
 
@@ -382,11 +541,11 @@ export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
     <section className="card case-page-panel case-ledger-tab">
       <div className="case-panel-header">
         <div>
-          <p className="eyebrow">Provider-neutral proof view</p>
-          <h2>Ledger & Verification</h2>
+          <p className="eyebrow">Case proof</p>
+          <h2>Ledger & verification</h2>
           <p>
-            Case-level anchoring, provider references, lifecycle, and
-            independent verification results.
+            Confirm evidence and final decisions on the ledger, then verify that
+            each proof still matches the case record.
           </p>
         </div>
         <button
@@ -406,14 +565,13 @@ export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
       )}
       {ledger.partial && (
         <div className="api-warning" role="status">
-          Partial ledger data is available. Refresh to recover the missing
-          projection.
+          Some ledger information could not be loaded. Refresh to try again.
         </div>
       )}
       {ledger.stale && (
         <div className="api-warning" role="status">
-          The last trustworthy ledger projection is stale. Displayed proof data
-          is retained while a refresh is attempted.
+          This ledger information may be out of date. The last verified data is
+          shown while Aegis refreshes it.
         </div>
       )}
       <LedgerAvailabilityNotice summary={summary} />
@@ -424,6 +582,7 @@ export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
       )}
       {summary && (
         <>
+          <LedgerTrustStrip summary={summary} />
           <div className="ledger-metric-grid">
             <div>
               <span>Case proof state</span>
@@ -456,70 +615,83 @@ export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
             onAnchor={() => void ledger.anchorDecision()}
             onOpen={(proof) => setSelectedId(proof.proofRequestId)}
           />
-          <section>
+          <IndependentVerification
+            summary={summary}
+            canVerify={ledger.canVerify}
+            busy={ledger.busy}
+            onVerify={(proof) => void ledger.verify(proof)}
+          />
+          <section className="ledger-evidence-section">
             <div className="evidence-section-heading">
               <div>
-                <h3>Current Evidence Versions</h3>
-                <p>One case-scoped projection; no per-row ledger requests.</p>
+                <h3>Current evidence versions</h3>
+                <p>
+                  See which evidence versions have a confirmed ledger proof.
+                </p>
               </div>
             </div>
             <div className="ledger-evidence-grid">
               {summary.evidenceTargets.map((target) => {
                 const proof = byVersion.get(target.evidenceVersionId);
                 return (
-                  <article key={target.evidenceVersionId}>
-                    <div>
+                  <article
+                    className="ledger-evidence-row"
+                    key={target.evidenceVersionId}
+                  >
+                    <div className="ledger-evidence-identity">
                       <strong>{target.classificationCode}</strong>
                       <CopyIdentifier
                         value={target.evidenceVersionId}
                         prefix="Version"
                       />
                     </div>
-                    <EvidenceProofStatus
-                      lifecycle={target.lifecycle}
-                      eligibility={target.eligibility}
-                      retryable={proof?.retryable}
-                      onOpen={
-                        proof
-                          ? () => setSelectedId(proof.proofRequestId)
-                          : undefined
-                      }
-                    />
-                    {!proof && ledger.canCreate && (
-                      <AnchorProofButton
-                        busy={ledger.busy}
-                        disabled={!summary.ledgerAvailability.available}
-                        disabledReason={
-                          !summary.ledgerAvailability.available
-                            ? "The configured ledger provider is unavailable."
+                    <div className="ledger-evidence-actions">
+                      <EvidenceProofStatus
+                        lifecycle={target.lifecycle}
+                        eligibility={target.eligibility}
+                        retryable={proof?.retryable}
+                        onOpen={
+                          proof
+                            ? () => setSelectedId(proof.proofRequestId)
                             : undefined
                         }
-                        label="Anchor"
-                        onClick={() =>
-                          void ledger.anchorEvidence(
-                            target.evidenceId,
-                            target.evidenceVersionId,
-                          )
-                        }
                       />
-                    )}
+                      {!proof && ledger.canCreate && (
+                        <AnchorProofButton
+                          busy={ledger.busy}
+                          disabled={!summary.ledgerAvailability.available}
+                          disabledReason={
+                            !summary.ledgerAvailability.available
+                              ? "The configured ledger provider is unavailable."
+                              : undefined
+                          }
+                          label="Anchor"
+                          onClick={() =>
+                            void ledger.anchorEvidence(
+                              target.evidenceId,
+                              target.evidenceVersionId,
+                            )
+                          }
+                        />
+                      )}
+                    </div>
                   </article>
                 );
               })}
               {!summary.evidenceTargets.length && (
                 <div className="empty-state">
-                  No available Evidence Version is eligible for anchoring.
+                  No evidence version is ready to anchor.
                 </div>
               )}
             </div>
           </section>
         </>
       )}
-      <section>
+      <section className="ledger-history-section">
         <div className="evidence-section-heading">
           <div>
             <h3>Proof history</h3>
-            <p>Stable newest-first proof requests for this case.</p>
+            <p>All proof requests for this case, newest first.</p>
           </div>
           <div className="ledger-filters" aria-label="Proof history filters">
             <SelectField
@@ -543,6 +715,13 @@ export function CaseLedgerTab({ ledger }: { ledger: CaseLedgerController }) {
               <option>FAILED</option>
             </SelectField>
           </div>
+        </div>
+        <div className="proof-history-head" aria-hidden="true">
+          <span>Proof type</span>
+          <span>Requested at (UTC)</span>
+          <span>Status</span>
+          <span>Provider</span>
+          <span>Action</span>
         </div>
         <div className="proof-list">
           {filtered.map((proof) => (
@@ -642,7 +821,7 @@ function TransactionDetails({ proof }: { proof: CaseProof | null }) {
   if (transaction.isLoading)
     return (
       <div className="transaction-detail-state" role="status">
-        Loading authoritative transaction state…
+        Loading transaction details…
       </div>
     );
   if (transaction.isError)

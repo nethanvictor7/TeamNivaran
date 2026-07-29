@@ -40,6 +40,7 @@ export function statusPresentation(value: string): {
       "NORMAL",
       "DECIDED",
       "CLOSED",
+      "COMPLETED",
     ].includes(normalized)
   )
     return { label, tone: "success" };
@@ -261,7 +262,7 @@ export function ConfirmationDialog({
         type="button"
         className="modal-backdrop"
         onClick={onCancel}
-        aria-label="Cancel emergency pause"
+        aria-label="Close confirmation"
       />
       <section
         ref={dialog}

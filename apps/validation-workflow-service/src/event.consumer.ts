@@ -36,7 +36,14 @@ export class WorkflowEventConsumer implements OnModuleInit, OnModuleDestroy {
     await this.consumer.run({
       eachMessage: async ({ message }) => {
         const raw = message.value?.toString("utf8") ?? "{}";
-        const parsed = eventEnvelopeSchema.safeParse(JSON.parse(raw));
+        let value: unknown;
+        try {
+          value = JSON.parse(raw);
+        } catch {
+          this.logger.warn({ event: "workflow.consumer.invalid_json" });
+          return;
+        }
+        const parsed = eventEnvelopeSchema.safeParse(value);
         if (!parsed.success) {
           this.logger.warn({ event: "workflow.consumer.invalid_event" });
           return;

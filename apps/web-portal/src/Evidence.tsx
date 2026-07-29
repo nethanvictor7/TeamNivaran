@@ -270,7 +270,8 @@ export function EvidencePanel({
         <div>
           <h3>Evidence</h3>
           <p className="muted-cell">
-            Quarantined, scanned, immutable case evidence.
+            Upload documents, track each version and see when a file needs
+            attention.
           </p>
         </div>
         <PermissionGate permission="evidence:upload">
@@ -608,9 +609,9 @@ export function EvidenceUploadDialog({
       >
         <div className="modal-header">
           <div>
-            <p className="eyebrow">Secure intake</p>
+            <p className="eyebrow">Add evidence</p>
             <h2 id="evidence-upload-title">
-              {awaiting ? "Provide evidence content" : "Upload case evidence"}
+              {awaiting ? "Add file content" : "Upload evidence"}
             </h2>
           </div>
           <button
@@ -704,7 +705,7 @@ export function EvidenceUploadDialog({
             onClick={submit}
           >
             <ShieldCheck size={16} />
-            Upload to quarantine
+            Upload and scan
           </button>
         </div>
       </section>
@@ -779,7 +780,7 @@ export function SecureDownloadButton({
         }}
       >
         <Download size={16} />
-        Controlled download
+        Download file
       </button>
       {error && <div className="api-problem">{error}</div>}
     </>
@@ -818,7 +819,8 @@ export function IntegrityCheckPanel({
         <div>
           <h3>Integrity verification</h3>
           <p>
-            Re-hash canonical bytes without changing the authoritative hash.
+            Check that the stored file still matches the fingerprint recorded
+            when it was accepted.
           </p>
         </div>
         <button
@@ -848,7 +850,7 @@ export function IntegrityCheckPanel({
         </div>
       ))}
       {!checks.data?.length && (
-        <p className="muted-cell">No integrity checks requested.</p>
+        <p className="muted-cell">No checks have been run yet.</p>
       )}
     </section>
   );
@@ -880,7 +882,7 @@ export function EvidenceLineagePanel({ asset }: { asset: EvidenceAsset }) {
   });
   return (
     <section className="evidence-detail-panel">
-      <h3>Lineage and relationships</h3>
+      <h3>Related evidence</h3>
       {lineage.data?.relationships.map((relationship) => (
         <div className="control-row" key={relationship.id}>
           <Link2 size={15} />
@@ -890,15 +892,15 @@ export function EvidenceLineagePanel({ asset }: { asset: EvidenceAsset }) {
         </div>
       ))}
       {!lineage.data?.relationships.length && (
-        <p className="muted-cell">No explicit asset relationships.</p>
+        <p className="muted-cell">No related evidence has been added.</p>
       )}
       <PermissionGate permission="evidence:metadata:update">
         <div className="evidence-relationship-form">
           <input
             value={relatedId}
             onChange={(event) => setRelatedId(event.target.value)}
-            placeholder="Related evidence UUID"
-            aria-label="Related evidence UUID"
+            placeholder="Related evidence ID"
+            aria-label="Related evidence ID"
           />
           <select
             value={relationshipType}
@@ -959,7 +961,7 @@ export function LegalHoldIndicator({
         </strong>
         <span>
           {asset.activeLegalHold?.reason ??
-            "Canonical evidence remains immutable in Phase 3."}
+            "This evidence keeps its full version history."}
         </span>
       </div>
       <PermissionGate permission="evidence:hold">
@@ -1019,7 +1021,7 @@ export function ProcessingStatusPanel({
         </strong>
         <span>
           {latest.failureDetail ??
-            "Downloads remain disabled until a clean scan and immutable promotion complete."}
+            "Downloads are available after the file passes its security scan."}
         </span>
       </div>
     </div>
@@ -1120,8 +1122,8 @@ export function EvidenceDetail({
             <section className="evidence-detail-panel">
               <div className="evidence-section-heading">
                 <div>
-                  <h3>Asset metadata</h3>
-                  <p>Stable identity and safe source provenance.</p>
+                  <h3>Evidence details</h3>
+                  <p>Title, source and external reference for this evidence.</p>
                 </div>
                 <PermissionGate permission="evidence:metadata:update">
                   <button
@@ -1189,8 +1191,10 @@ export function EvidenceDetail({
             <section className="evidence-detail-panel">
               <div className="evidence-section-heading">
                 <div>
-                  <h3>Immutable versions</h3>
-                  <p>Every correction and replacement remains accessible.</p>
+                  <h3>Version history</h3>
+                  <p>
+                    Corrections and replacements are kept as separate versions.
+                  </p>
                 </div>
                 <PermissionGate permission="evidence:version:create">
                   <button className="secondary-button" onClick={onUpload}>
@@ -1236,7 +1240,7 @@ export function EvidenceDetail({
                 <div className="evidence-section-heading">
                   <div>
                     <h3>Ledger proof</h3>
-                    <p>Shared case-level proof state for this exact version.</p>
+                    <p>Proof status for the current evidence version.</p>
                   </div>
                   {(() => {
                     const target = ledger.summary?.evidenceTargets.find(
@@ -1282,7 +1286,7 @@ export function EvidenceDetail({
                       onOpenLedger();
                     }}
                   >
-                    Open ledger history
+                    View ledger history
                   </button>
                 </div>
               </section>

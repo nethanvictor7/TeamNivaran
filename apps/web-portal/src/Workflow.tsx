@@ -15,6 +15,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PermissionGate, useAuth } from "./auth";
 import type { CaseLedgerController } from "./CaseLedger";
 import { ProofStatusBadge } from "./LedgerProofs";
+import { ApplicationShell } from "./ApplicationShell";
+import { casePath, navigate } from "./routing";
 
 type ValidationResult = {
   id: string;
@@ -234,7 +236,7 @@ export function WorkflowPanel({
   }
 
   if (query.isLoading)
-    return <div className="card empty-state">Loading governed workflow…</div>;
+    return <div className="card empty-state">Loading workflow…</div>;
   if (query.isError)
     return <div className="api-problem">{query.error.message}</div>;
   if (!current)
@@ -242,7 +244,7 @@ export function WorkflowPanel({
       <section className="card case-page-panel workflow-empty">
         <ShieldCheck size={28} />
         <h2>No workflow started</h2>
-        <p>Start the published governed validation and human review process.</p>
+        <p>Start the checks and human review required for this type of case.</p>
         <PermissionGate permission="workflow:start">
           <button
             className="primary-button"
@@ -275,7 +277,7 @@ export function WorkflowPanel({
               {current.definitionVersion.versionNumber}
             </p>
             <h2>{current.definitionVersion.definition.name}</h2>
-            <p>Deterministic validation and controlled human decision.</p>
+            <p>Required checks, review and final decision for this case.</p>
           </div>
           <WorkflowStatusBadge status={current.state} />
         </div>
@@ -290,11 +292,11 @@ export function WorkflowPanel({
             <strong>{task?.taskType.replaceAll("_", " ") ?? "None"}</strong>
           </div>
           <div>
-            <span>Case synchronization</span>
+            <span>Case update</span>
             <strong>{current.caseSyncStatus}</strong>
           </div>
           <div>
-            <span>Aggregate version</span>
+            <span>Workflow version</span>
             <strong>v{current.rowVersion}</strong>
           </div>
         </div>
@@ -327,8 +329,11 @@ export function WorkflowPanel({
             <div>
               <h2>Validation run {validation.runNumber}</h2>
               <p>
-                Exact metadata snapshot · {validation.evidenceSnapshot.length}{" "}
-                Evidence Versions
+                {validation.evidenceSnapshot.length} evidence{" "}
+                {validation.evidenceSnapshot.length === 1
+                  ? "version"
+                  : "versions"}{" "}
+                checked
               </p>
             </div>
             <WorkflowStatusBadge status={validation.status} />
@@ -555,7 +560,7 @@ export function WorkflowPanel({
         <section className="card workflow-decision-record">
           <Gavel size={22} />
           <div>
-            <span>Immutable final human decision</span>
+            <span>Final human decision</span>
             <h3>{current.decisions[0].outcome}</h3>
             <p>{new Date(current.decisions[0].decidedAt).toLocaleString()}</p>
           </div>
@@ -591,7 +596,7 @@ function WorkflowDefinitionAdmin() {
       const definition = (await command(auth, "/api/v1/workflow-definitions", {
         code: code.trim().toUpperCase(),
         name: name.trim(),
-        description: "Organization-owned deterministic approval workflow.",
+        description: "Approval workflow managed by your organisation.",
         isDefault: false,
       })) as WorkflowDefinition;
       const version = (await command(
@@ -683,7 +688,10 @@ function WorkflowDefinitionAdmin() {
       <div className="card-header">
         <div>
           <h2>Workflow definitions</h2>
-          <p>Publish immutable, server-validated organization policy.</p>
+          <p>
+            Define the checks, review steps and decision rules used for each
+            case type.
+          </p>
         </div>
       </div>
       <div className="workflow-definition-form">
@@ -769,7 +777,7 @@ function WorkflowDefinitionAdmin() {
   );
 }
 
-export function WorkflowOperations({ onCases }: { onCases(): void }) {
+export function WorkflowOperations() {
   const auth = useAuth();
   const query = useQuery({
     queryKey: ["workflow-tasks"],
@@ -785,35 +793,20 @@ export function WorkflowOperations({ onCases }: { onCases(): void }) {
     },
   });
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-mark">
-            <ShieldCheck size={22} />
+    <ApplicationShell activeWorkspace="workflow">
+      <section className="module-page workflow-operations-page">
+        <div className="module-identity">
+          <span className="module-identity-icon" aria-hidden="true">
+            <Gavel size={22} />
           </span>
           <div>
-            <div className="brand-name">CDEP</div>
-            <div className="brand-caption">Decision Evidence</div>
-          </div>
-        </div>
-        <p className="nav-label">Workspace</p>
-        <button className="nav-item" onClick={onCases}>
-          <ListChecks size={18} /> Decision cases
-        </button>
-        <button className="nav-item nav-item-active">
-          <Gavel size={18} /> Workflow queue
-        </button>
-      </aside>
-      <main className="main-content">
-        <section className="page-heading">
-          <div>
-            <p className="eyebrow">Governed human decisioning</p>
+            <p className="eyebrow">Review and decisions</p>
             <h1>Workflow queue</h1>
             <p className="page-subtitle">
-              Organization-scoped validation, review, and decision tasks.
+              See the validation, review and decision tasks waiting for action.
             </p>
           </div>
-        </section>
+        </div>
         <section className="card work-queue">
           <div className="card-header">
             <div>
@@ -822,11 +815,11 @@ export function WorkflowOperations({ onCases }: { onCases(): void }) {
             </div>
           </div>
           {query.isLoading ? (
-            <div className="empty-state">Loading Workflow queue…</div>
+            <div className="empty-state">Loading workflow queue…</div>
           ) : query.isError ? (
             <div className="api-problem">{query.error.message}</div>
           ) : !query.data?.items.length ? (
-            <div className="empty-state">No open Workflow tasks.</div>
+            <div className="empty-state">No workflow tasks need attention.</div>
           ) : (
             <div className="table-wrap">
               <table>
@@ -855,7 +848,12 @@ export function WorkflowOperations({ onCases }: { onCases(): void }) {
                           : "No due date"}
                       </td>
                       <td>
-                        <button className="text-button" onClick={onCases}>
+                        <button
+                          className="text-button"
+                          onClick={() =>
+                            navigate(casePath(task.caseId, "workflow"))
+                          }
+                        >
                           Open case
                         </button>
                       </td>
@@ -869,7 +867,7 @@ export function WorkflowOperations({ onCases }: { onCases(): void }) {
         <PermissionGate permission="workflow:definition:manage">
           <WorkflowDefinitionAdmin />
         </PermissionGate>
-      </main>
-    </div>
+      </section>
+    </ApplicationShell>
   );
 }

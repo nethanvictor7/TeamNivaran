@@ -8,9 +8,9 @@ and the in-cluster dependencies that are compatible with GKE.
 - Single-node Kafka with persistent storage and topic bootstrap
 - Single-node Garage object storage with persistent storage
 - ClamAV with persistent signature storage
-- Seven AlloyDB Prisma migration Jobs
+- Eight AlloyDB Prisma migration Jobs
 - Identity seed and evidence bucket bootstrap Jobs
-- Seven backend Deployments and ClusterIP Services
+- Eight backend Deployments and ClusterIP Services
 - A two-organization Fabric 2.5 network with a Raft orderer, two peers, and the
   proof registry running as chaincode-as-a-service
 - API Gateway and portal edge resources
@@ -72,9 +72,11 @@ The script creates:
 - `alloydb-credentials`
 - `cdep-database-urls`
 - `cdep-runtime-secrets`
+- `cdep-audit-secrets`
 
-It preserves an existing `cdep-runtime-secrets` Secret to avoid silently
-rotating JWT and encryption keys. Store a backup in an approved secret manager.
+It preserves existing runtime and audit Secrets to avoid silently rotating JWT,
+encryption, and audit cursor-signing keys. Store backups in an approved secret
+manager.
 
 The password must be URL-safe because it is embedded in PostgreSQL connection
 URLs. Percent-encode reserved URL characters before running the script.

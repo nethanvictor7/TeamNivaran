@@ -480,3 +480,118 @@ export const caseExternalReferenceSchema = z.object({
   createdBy: z.uuid(),
   createdAt: z.iso.datetime(),
 });
+
+export const auditOutcomeSchema = z.enum([
+  "SUCCESS",
+  "FAILURE",
+  "DENIED",
+  "PENDING",
+  "INFORMATIONAL",
+]);
+export const auditRecordSchema = z.object({
+  id: z.uuid(),
+  eventId: z.uuid(),
+  organizationId: z.uuid(),
+  occurredAt: z.iso.datetime(),
+  ingestedAt: z.iso.datetime(),
+  sourceService: z.string(),
+  eventType: z.string(),
+  schemaVersion: z.string(),
+  actorType: z.string(),
+  actorId: z.string(),
+  correlationId: z.uuid(),
+  causationId: z.uuid().nullable(),
+  traceId: z.string().nullable(),
+  requestId: z.string().nullable(),
+  idempotencyKey: z.string().nullable(),
+  resourceType: z.string(),
+  resourceId: z.string(),
+  action: z.string(),
+  outcome: auditOutcomeSchema,
+  classification: z.string(),
+  metadata: z.record(z.string(), z.unknown()),
+  previousRecordHash: z.string().length(64).nullable(),
+  recordHash: z.string().length(64),
+  sourceTopic: z.string(),
+  sourcePartition: z.number().int().nonnegative(),
+  sourceOffset: z.string().regex(/^\d+$/),
+  projectionVersion: z.number().int().positive(),
+  lateArrival: z.boolean(),
+});
+export const auditSearchQuerySchema = z
+  .object({
+    search: z.string().trim().max(200).optional(),
+    eventType: z.string().trim().max(160).optional(),
+    sourceService: z.string().trim().max(120).optional(),
+    outcome: auditOutcomeSchema.optional(),
+    classification: z.string().trim().max(40).optional(),
+    resourceType: z.string().trim().max(100).optional(),
+    resourceId: z.string().trim().max(160).optional(),
+    correlationId: z.uuid().optional(),
+    from: z.iso.datetime().optional(),
+    to: z.iso.datetime().optional(),
+    sort: z.enum(["OCCURRED_DESC", "OCCURRED_ASC"]).default("OCCURRED_DESC"),
+    cursor: z.string().min(20).max(4096).optional(),
+    pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  })
+  .strict();
+export const auditSearchResponseSchema = z.object({
+  items: z.array(auditRecordSchema),
+  nextCursor: z.string().nullable(),
+  snapshotBoundary: z.iso.datetime(),
+  freshness: z.object({
+    status: z.string(),
+    projectionVersion: z.number().int().positive(),
+    lastIngestedAt: z.iso.datetime().nullable(),
+    checkpoints: z.array(
+      z.object({
+        id: z.uuid(),
+        topic: z.string(),
+        partition: z.number().int().nonnegative(),
+        offset: z.string().regex(/^\d+$/),
+        lastEventId: z.uuid().nullable(),
+        updatedAt: z.iso.datetime(),
+      }),
+    ),
+  }),
+});
+export const auditReportRequestSchema = z
+  .object({
+    reportKey: z.enum([
+      "CASE_DECISION_DOSSIER",
+      "EVIDENCE_VALIDATION_HISTORY",
+      "HUMAN_DECISION_SUMMARY",
+      "LEDGER_VERIFICATION_HISTORY",
+      "OPERATIONAL_AUDIT_ACTIVITY",
+      "AI_ASSESSMENT_GOVERNANCE",
+    ]),
+    parameters: z.record(z.string(), z.unknown()).default({}),
+  })
+  .strict();
+export const auditExportRequestSchema = z
+  .object({
+    format: z.enum(["CSV", "JSON"]),
+    filters: auditSearchQuerySchema
+      .omit({ cursor: true, pageSize: true })
+      .default({ sort: "OCCURRED_DESC" }),
+  })
+  .strict();
+export const auditOperationRequestSchema = z
+  .object({
+    type: z.enum(["REPLAY", "PROJECTION_REBUILD", "RECONCILIATION"]),
+    reason: z.string().trim().min(10).max(500),
+    dryRun: z.boolean().default(true),
+    parameters: z.record(z.string(), z.unknown()).default({}),
+  })
+  .strict();
+export const auditArtifactGrantSchema = z.object({
+  url: z.url(),
+  expiresAt: z.iso.datetime(),
+});
+export type AuditOutcome = z.infer<typeof auditOutcomeSchema>;
+export type AuditRecord = z.infer<typeof auditRecordSchema>;
+export type AuditSearchQuery = z.infer<typeof auditSearchQuerySchema>;
+export type AuditSearchResponse = z.infer<typeof auditSearchResponseSchema>;
+export type AuditReportRequest = z.infer<typeof auditReportRequestSchema>;
+export type AuditExportRequest = z.infer<typeof auditExportRequestSchema>;
+export type AuditOperationRequest = z.infer<typeof auditOperationRequestSchema>;

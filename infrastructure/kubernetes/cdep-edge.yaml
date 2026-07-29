@@ -22,6 +22,7 @@ data:
   WORKFLOW_SERVICE_URL: http://validation-workflow-service:3005
   AI_ASSESSMENT_SERVICE_URL: http://ai-assessment-service:3006
   LEDGER_SERVICE_URL: http://ledger-service:3007
+  AUDIT_SERVICE_URL: http://audit-query-service:3008
   JWT_JWKS_URL: http://identity-access-service:3001/api/v1/auth/jwks
   JWT_ISSUER: cdep-identity-access-service
   JWT_AUDIENCE: cdep-api

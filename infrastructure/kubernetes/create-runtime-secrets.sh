@@ -34,8 +34,16 @@ kubectl -n "$namespace" create secret generic cdep-database-urls \
   --from-literal=WORKFLOW_DATABASE_URL="${database_url_prefix}/${WORKFLOW_DB_NAME:-cdep_workflow}${database_url_suffix}" \
   --from-literal=AI_DATABASE_URL="${database_url_prefix}/${AI_DB_NAME:-cdep_ai}${database_url_suffix}" \
   --from-literal=LEDGER_DATABASE_URL="${database_url_prefix}/${LEDGER_DB_NAME:-cdep_ledger}${database_url_suffix}" \
+  --from-literal=AUDIT_DATABASE_URL="${database_url_prefix}/${AUDIT_DB_NAME:-cdep_audit}${database_url_suffix}" \
   --dry-run=client -o yaml |
   kubectl apply -f -
+
+if ! kubectl -n "$namespace" get secret cdep-audit-secrets >/dev/null 2>&1; then
+  audit_cursor_signing_secret="$(openssl rand -hex 32)"
+  kubectl -n "$namespace" create secret generic cdep-audit-secrets \
+    --from-literal=CURSOR_SIGNING_SECRET="$audit_cursor_signing_secret"
+  echo "Created cdep-audit-secrets. Back it up in an approved secret manager."
+fi
 
 if kubectl -n "$namespace" get secret cdep-runtime-secrets >/dev/null 2>&1; then
   echo "Secret cdep-runtime-secrets already exists; preserving its signing and encryption keys."
