@@ -1,0 +1,172 @@
+openapi: 3.1.0
+info:
+  title: CDEP AI Assessment API
+  version: 1.0.0
+  description: Governed decision-support API backed by MockCortexGateway in Phase 5.
+paths:
+  /api/v1/cases/{caseId}/ai-assessments:
+    get:
+      summary: List tenant-scoped assessments for a case
+      responses:
+        "200":
+          description: Assessment summaries
+    post:
+      summary: Persist and queue an assessment
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Assessment queued
+  /api/v1/ai-assessments/{assessmentId}:
+    get:
+      summary: Get normalized assessment detail and provenance
+      responses:
+        "200":
+          description: Assessment detail
+  /api/v1/ai-assessments/{assessmentId}/cancel:
+    post:
+      summary: Request cancellation
+      responses:
+        "200":
+          description: Cancellation recorded
+  /api/v1/ai-assessments/{assessmentId}/feedback:
+    post:
+      summary: Record separate human feedback
+      responses:
+        "201":
+          description: Feedback recorded
+  /api/v1/ai-assessments/{assessmentId}/acceptance:
+    post:
+      summary: Accept explicit items into an unsubmitted Workflow draft
+      responses:
+        "201":
+          description: Draft provenance recorded
+  /api/v1/ai-assessments/{assessmentId}/input-references:
+    get:
+      summary: Read safe immutable Evidence references pinned to the assessment
+      responses:
+        "200":
+          description: Pinned input references
+  /api/v1/ai-assessments/{assessmentId}/executions:
+    get:
+      summary: Read safe execution metadata without raw adapter responses
+      responses:
+        "200":
+          description: Execution history
+  /api/v1/ai-governance:
+    get:
+      summary: Read governed policies, prompts, adapter state, and kill switches
+      responses:
+        "200":
+          description: Governance configuration
+  /api/v1/ai-governance/cortex-configurations:
+    get:
+      summary: List safe Mock Cortex configuration metadata
+      responses:
+        "200":
+          description: Tenant and platform configurations
+    post:
+      summary: Create an organization-scoped Mock Cortex configuration
+      responses:
+        "201":
+          description: Configuration created
+  /api/v1/ai-governance/cortex-configurations/{configurationId}:
+    patch:
+      summary: Update a mutable organization-scoped Mock Cortex configuration
+      responses:
+        "200":
+          description: Configuration updated
+  /api/v1/ai-governance/cortex-configurations/{configurationId}/test:
+    post:
+      summary: Run a deterministic synthetic adapter self-test
+      responses:
+        "200":
+          description: Safe synthetic self-test result
+  /api/v1/ai-governance/model-policies:
+    get:
+      summary: List safe model and input policies
+      responses:
+        "200":
+          description: Model policies
+    post:
+      summary: Create an organization-scoped policy
+      responses:
+        "201":
+          description: Policy created
+  /api/v1/ai-governance/model-policies/{policyId}:
+    patch:
+      summary: Update or disable an organization-scoped policy
+      responses:
+        "200":
+          description: Policy updated
+  /api/v1/ai-governance/prompt-templates:
+    get:
+      summary: List prompt templates and immutable version history
+      responses:
+        "200":
+          description: Prompt templates
+    post:
+      summary: Create an organization-scoped prompt template
+      responses:
+        "201":
+          description: Prompt template created
+  /api/v1/ai-governance/prompt-templates/{templateId}/versions:
+    post:
+      summary: Create a draft prompt version
+      responses:
+        "201":
+          description: Draft created
+  /api/v1/ai-governance/prompt-templates/{templateId}/versions/{versionId}:
+    patch:
+      summary: Edit an unpublished prompt version
+      responses:
+        "200":
+          description: Draft updated
+  /api/v1/ai-governance/prompt-templates/{templateId}/versions/{versionId}/publish:
+    post:
+      summary: Publish an immutable prompt version
+      responses:
+        "201":
+          description: Version published
+  /api/v1/ai-governance/prompt-templates/{templateId}/versions/{versionId}/retire:
+    post:
+      summary: Retire a published version for new requests
+      responses:
+        "201":
+          description: Version retired
+  /api/v1/ai-governance/kill-switches/activate:
+    post:
+      summary: Activate an explicit organization-scoped kill switch
+      responses:
+        "201":
+          description: Kill switch activated
+  /api/v1/ai-governance/kill-switches/deactivate:
+    post:
+      summary: Explicitly deactivate an organization-scoped kill switch
+      responses:
+        "201":
+          description: Kill switch deactivated
+  /api/v1/ai-governance/operations:
+    get:
+      summary: Read the tenant-scoped assessment queue and safe failure history
+      responses:
+        "200":
+          description: Operations view
+  /api/v1/ai-governance/operations/{failureId}/retry:
+    post:
+      summary: Retry an eligible exhausted operation
+      responses:
+        "201":
+          description: Operation requeued
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - bearer: []

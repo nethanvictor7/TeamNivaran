@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+apps/web-portal/vite.config.js
+apps/web-portal/vite.config.d.ts
+package-lock.json

@@ -1,0 +1,131 @@
+openapi: 3.1.0
+info:
+  title: CDEP Validation Workflow API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /workflow-definitions:
+    get:
+      summary: List scoped Workflow definitions
+      responses:
+        "200": { description: Definitions and immutable versions }
+    post:
+      summary: Create an organization draft definition
+      responses:
+        "201": { description: Draft created }
+  /cases/{caseId}/workflow/start:
+    post:
+      summary: Start one active governed cycle
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201": { description: Workflow started }
+        "409": { description: Active cycle or idempotency conflict }
+  /cases/{caseId}/workflow:
+    get:
+      summary: Current and historical Workflow cycles
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200": { description: Workflow cycles }
+        "404": { description: Case is inaccessible }
+  /cases/{caseId}/workflow/validate:
+    post:
+      summary: Run deterministic validation against authoritative metadata
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200": { description: Immutable Validation Run }
+        "409": { description: Stale aggregate }
+  /workflow/tasks:
+    get:
+      summary: Organization-scoped task queue
+      responses:
+        "200": { description: Paginated tasks }
+  /workflow/tasks/{taskId}/claim:
+    post:
+      summary: Atomically claim an eligible task
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Claimed task }
+        "409": { description: Claim conflict }
+  /workflow/tasks/{taskId}/submit-review:
+    post:
+      summary: Submit human review with exact Evidence snapshot
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Review recorded }
+  /cases/{caseId}/recommendations:
+    post:
+      summary: Record an advisory human recommendation
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200": { description: Recommendation recorded }
+  /cases/{caseId}/decisions:
+    get:
+      summary: List immutable decision history
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200": { description: Decisions and exact safe Evidence snapshots }
+        "404": { description: Case is inaccessible }
+  /decisions/{decisionId}:
+    get:
+      summary: Get one immutable decision and safe snapshots
+      parameters:
+        - in: path
+          name: decisionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Immutable decision }
+        "404": { description: Decision is inaccessible }
+  /cases/{caseId}/decision/approve:
+    post:
+      summary: Record immutable final human approval
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201": { description: Decision committed }
+        "409": { description: Stale snapshot or four-eyes restriction }
+  /cases/{caseId}/decision/reject:
+    post:
+      summary: Record immutable final human rejection
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201": { description: Decision committed }
+        "409":
+          { description: Stale snapshot or separation-of-duties restriction }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    CaseId:
+      in: path
+      name: caseId
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema: { type: string, maxLength: 200 }

@@ -1,0 +1,147 @@
+Organizations:
+  - &OrdererOrg
+    Name: OrdererMSP
+    ID: OrdererMSP
+    MSPDir: crypto-config/ordererOrganizations/example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+    OrdererEndpoints:
+      - orderer.example.com:7050
+
+  - &CDEP
+    Name: CDEPMSP
+    ID: CDEPMSP
+    MSPDir: crypto-config/peerOrganizations/cdep.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('CDEPMSP.admin', 'CDEPMSP.peer', 'CDEPMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('CDEPMSP.admin', 'CDEPMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('CDEPMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('CDEPMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.cdep.example.com
+        Port: 7051
+
+  - &Audit
+    Name: AuditMSP
+    ID: AuditMSP
+    MSPDir: crypto-config/peerOrganizations/audit.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('AuditMSP.admin', 'AuditMSP.peer', 'AuditMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('AuditMSP.admin', 'AuditMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('AuditMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('AuditMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.audit.example.com
+        Port: 8051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_5: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer.example.com:7050
+  EtcdRaft:
+    Consenters:
+      - Host: orderer.example.com
+        Port: 7050
+        ClientTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+        ServerTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+  BatchTimeout: 1s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 10 MB
+    PreferredMaxBytes: 2 MB
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  CDEPChannel:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *CDEP
+        - *Audit

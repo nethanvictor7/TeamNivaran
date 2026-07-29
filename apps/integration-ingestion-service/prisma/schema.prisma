@@ -1,0 +1,343 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/@cdep/integration-prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SourceStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum ConnectorType {
+  WEBHOOK
+  SQL_POLL
+}
+
+enum ConnectorStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ERROR
+  ARCHIVED
+}
+
+enum SourceTriggerStatus {
+  RECEIVED
+  EXTRACTION_FAILED
+  CORRELATION_PENDING
+  UNMATCHED
+  AMBIGUOUS_CORRELATION
+  READY
+  PUBLISHED
+  FAILED
+}
+
+enum PublicationStatus {
+  DRAFT
+  PUBLISHED
+  RETIRED
+}
+
+model SourceSystem {
+  id             String                @id @default(uuid()) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  code           String                @db.VarChar(80)
+  name           String                @db.VarChar(200)
+  description    String?               @db.VarChar(1000)
+  status         SourceStatus          @default(DRAFT)
+  version        Int                   @default(1)
+  createdBy      String                @map("created_by") @db.Uuid
+  updatedBy      String                @map("updated_by") @db.Uuid
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+  connectors     ConnectorDefinition[]
+
+  @@unique([organizationId, code])
+  @@map("source_systems")
+}
+
+model ConnectorDefinition {
+  id                     String                @id @default(uuid()) @db.Uuid
+  organizationId         String                @map("organization_id") @db.Uuid
+  sourceSystemId         String                @map("source_system_id") @db.Uuid
+  connectorKey           String                @unique @default(uuid()) @map("connector_key") @db.Uuid
+  name                   String                @db.VarChar(200)
+  type                   ConnectorType
+  triggerType            String                @map("trigger_type") @db.VarChar(160)
+  status                 ConnectorStatus       @default(DRAFT)
+  configurationJson      Json                  @map("configuration_json")
+  credentialId           String?               @map("credential_id") @db.Uuid
+  pollIntervalSeconds    Int?                  @map("poll_interval_seconds")
+  batchSize              Int?                  @map("batch_size")
+  consecutiveFailureCount Int                  @default(0) @map("consecutive_failure_count")
+  lastSuccessAt          DateTime?             @map("last_success_at") @db.Timestamptz
+  lastErrorCode          String?               @map("last_error_code") @db.VarChar(120)
+  nextRunAt              DateTime?             @map("next_run_at") @db.Timestamptz
+  version                Int                   @default(1)
+  createdBy              String                @map("created_by") @db.Uuid
+  updatedBy              String                @map("updated_by") @db.Uuid
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+  sourceSystem           SourceSystem          @relation(fields: [sourceSystemId], references: [id], onDelete: Cascade)
+  extractionRules        FieldExtractionRule[]
+
+  @@index([organizationId, sourceSystemId])
+  @@map("connector_definitions")
+}
+
+model ConnectorCredential {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  provider       String   @db.VarChar(40)
+  secretRef      String?  @map("secret_ref") @db.VarChar(500)
+  algorithm      String?  @db.VarChar(40)
+  keyId          String?  @map("key_id") @db.VarChar(120)
+  nonce          Bytes?
+  authTag        Bytes?   @map("auth_tag")
+  ciphertext     Bytes?
+  rotatedAt      DateTime @default(now()) @map("rotated_at") @db.Timestamptz
+
+  @@map("connector_credentials")
+}
+
+model FieldExtractionRule {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  connectorId    String   @map("connector_id") @db.Uuid
+  targetField    String   @map("target_field") @db.VarChar(80)
+  sourcePath     String   @map("source_path") @db.VarChar(300)
+  required       Boolean  @default(false)
+  defaultValue   String?  @map("default_value") @db.VarChar(500)
+  transform      String?  @db.VarChar(40)
+  version        Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  connector      ConnectorDefinition @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+
+  @@unique([connectorId, targetField])
+  @@index([organizationId, connectorId])
+  @@map("field_extraction_rules")
+}
+
+model CorrelationRuleSet {
+  id             String                   @id @default(uuid()) @db.Uuid
+  organizationId String                   @map("organization_id") @db.Uuid
+  connectorId    String                   @unique @map("connector_id") @db.Uuid
+  name           String                   @db.VarChar(200)
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  versions       CorrelationRuleVersion[]
+
+  @@map("correlation_rule_sets")
+}
+
+model CorrelationRuleVersion {
+  id                String            @id @default(uuid()) @db.Uuid
+  organizationId    String            @map("organization_id") @db.Uuid
+  ruleSetId         String            @map("rule_set_id") @db.Uuid
+  version           Int
+  ruleType          String            @map("rule_type") @db.VarChar(80)
+  referenceType     String?           @map("reference_type") @db.VarChar(80)
+  status            PublicationStatus @default(PUBLISHED)
+  createdBy         String            @map("created_by") @db.Uuid
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  ruleSet           CorrelationRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleSetId, version])
+  @@map("correlation_rule_versions")
+}
+
+model ConnectorCheckpoint {
+  connectorId    String   @id @map("connector_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  watermark      String   @db.VarChar(200)
+  tieBreaker     String   @map("tie_breaker") @db.VarChar(300)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("connector_checkpoints")
+}
+
+model ConnectorLease {
+  connectorId    String   @id @map("connector_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  ownerId        String   @map("owner_id") @db.Uuid
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz
+
+  @@map("connector_leases")
+}
+
+model IngestionRun {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  connectorId     String    @map("connector_id") @db.Uuid
+  status          String    @db.VarChar(40)
+  rowsCaptured    Int       @default(0) @map("rows_captured")
+  checkpointBefore Json?    @map("checkpoint_before")
+  checkpointAfter  Json?    @map("checkpoint_after")
+  startedAt       DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz
+  errorCode       String?   @map("error_code") @db.VarChar(120)
+
+  @@index([organizationId, connectorId, startedAt])
+  @@map("ingestion_runs")
+}
+
+model SourceTrigger {
+  id                     String              @id @default(uuid()) @db.Uuid
+  organizationId         String              @map("organization_id") @db.Uuid
+  sourceSystemId         String              @map("source_system_id") @db.Uuid
+  connectorId            String              @map("connector_id") @db.Uuid
+  connectorType          ConnectorType       @map("connector_type")
+  triggerType            String              @map("trigger_type") @db.VarChar(160)
+  sourceRecordId         String?             @map("source_record_id") @db.VarChar(300)
+  idempotencyKey         String?             @map("idempotency_key") @db.VarChar(500)
+  occurredAt             DateTime?           @map("occurred_at") @db.Timestamptz
+  receivedAt             DateTime            @default(now()) @map("received_at") @db.Timestamptz
+  payloadJson            Json                @map("payload_json")
+  payloadSha256          String              @map("payload_sha256") @db.Char(64)
+  metadataJson           Json                @map("metadata_json")
+  extractedFieldsJson    Json?               @map("extracted_fields_json")
+  caseId                 String?             @map("case_id") @db.Uuid
+  status                 SourceTriggerStatus @default(RECEIVED)
+  correlationId          String              @map("correlation_id") @db.Uuid
+  causationId            String?             @map("causation_id") @db.Uuid
+  processingAttemptCount Int                 @default(0) @map("processing_attempt_count")
+  lastErrorCode          String?             @map("last_error_code") @db.VarChar(120)
+  createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([organizationId, connectorId, idempotencyKey])
+  @@index([organizationId, status, receivedAt])
+  @@map("source_triggers")
+}
+
+model CanonicalTriggerEvent {
+  id               String    @id @default(uuid()) @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  sourceTriggerId  String    @map("source_trigger_id") @db.Uuid
+  caseId           String?   @map("case_id") @db.Uuid
+  eventJson        Json      @map("event_json")
+  status           String    @db.VarChar(40)
+  correlationId    String    @map("correlation_id") @db.Uuid
+  publishedAt      DateTime? @map("published_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([sourceTriggerId])
+  @@map("canonical_trigger_events")
+}
+
+model ProcessingAttempt {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  sourceTriggerId String   @map("source_trigger_id") @db.Uuid
+  stage           String   @db.VarChar(80)
+  outcome         String   @db.VarChar(40)
+  errorCode       String?  @map("error_code") @db.VarChar(120)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([organizationId, sourceTriggerId, createdAt])
+  @@map("processing_attempts")
+}
+
+model FailedTrigger {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  sourceTriggerId String    @map("source_trigger_id") @db.Uuid
+  errorCode       String    @map("error_code") @db.VarChar(120)
+  sanitizedDetail String    @map("sanitized_detail") @db.VarChar(1000)
+  resolvedAt      DateTime? @map("resolved_at") @db.Timestamptz
+
+  @@index([organizationId, resolvedAt])
+  @@map("failed_triggers")
+}
+
+model JourneyCorrelation {
+  id                     String   @id @default(uuid()) @db.Uuid
+  organizationId         String   @map("organization_id") @db.Uuid
+  sourceTriggerId        String   @map("source_trigger_id") @db.Uuid
+  caseId                 String?  @map("case_id") @db.Uuid
+  outcome                String   @db.VarChar(40)
+  ruleVersionId          String?  @map("rule_version_id") @db.Uuid
+  resolvedBy             String?  @map("resolved_by") @db.Uuid
+  resolutionReason       String?  @map("resolution_reason") @db.VarChar(1000)
+  previousState          String?  @map("previous_state") @db.VarChar(40)
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([organizationId, sourceTriggerId, createdAt])
+  @@map("journey_correlations")
+}
+
+model DecisionJourneyEvent {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
+  caseId             String?  @map("case_id") @db.Uuid
+  sourceTriggerId    String   @map("source_trigger_id") @db.Uuid
+  canonicalEventId   String?  @map("canonical_event_id") @db.Uuid
+  eventType          String   @map("event_type") @db.VarChar(160)
+  sourceSystemId     String   @map("source_system_id") @db.Uuid
+  sourceRecordId     String?  @map("source_record_id") @db.VarChar(300)
+  occurredAt         DateTime @map("occurred_at") @db.Timestamptz
+  receivedAt         DateTime @map("received_at") @db.Timestamptz
+  processingStatus   String   @map("processing_status") @db.VarChar(40)
+  correlationOutcome String   @map("correlation_outcome") @db.VarChar(40)
+  correlationId      String   @map("correlation_id") @db.Uuid
+  causationId        String?  @map("causation_id") @db.Uuid
+  summaryJson        Json     @map("summary_json")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([organizationId, caseId, occurredAt])
+  @@index([organizationId, sourceTriggerId])
+  @@map("decision_journey_events")
+}
+
+model ReplayRequest {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  sourceTriggerId String   @map("source_trigger_id") @db.Uuid
+  requestedBy     String   @map("requested_by") @db.Uuid
+  reason          String   @db.VarChar(1000)
+  status          String   @db.VarChar(40)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("replay_requests")
+}
+
+model IdempotencyRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  key            String   @db.VarChar(200)
+  responseJson   Json     @map("response_json")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([organizationId, key])
+  @@map("idempotency_records")
+}
+
+model OutboxEvent {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  topic          String    @db.VarChar(160)
+  messageKey     String    @map("message_key") @db.VarChar(300)
+  eventJson      Json      @map("event_json")
+  correlationId  String    @map("correlation_id") @db.Uuid
+  occurredAt     DateTime  @default(now()) @map("occurred_at") @db.Timestamptz
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime? @map("next_attempt_at") @db.Timestamptz
+
+  @@index([publishedAt, nextAttemptAt, occurredAt])
+  @@map("outbox_events")
+}
+
+model InboxEvent {
+  eventId    String   @id @map("event_id") @db.Uuid
+  eventType  String   @map("event_type") @db.VarChar(160)
+  processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz
+
+  @@map("inbox_events")
+}

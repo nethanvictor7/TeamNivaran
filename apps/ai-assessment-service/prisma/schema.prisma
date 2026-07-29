@@ -1,0 +1,397 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/@cdep/ai-prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AssessmentStatus {
+  QUEUED
+  PREPARING_INPUT
+  READY_FOR_INFERENCE
+  SUBMITTED
+  RUNNING
+  VALIDATING_OUTPUT
+  SUCCEEDED
+  FAILED
+  CANCEL_REQUESTED
+  CANCELLED
+  POLICY_BLOCKED
+  INVALID_OUTPUT
+  SUPERSEDED
+}
+
+enum GovernanceStatus {
+  DRAFT
+  PUBLISHED
+  RETIRED
+}
+
+model AiRuntimeConfig {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String?  @map("organization_id") @db.Uuid
+  code             String   @db.VarChar(80)
+  mockProfile      String   @default("SUCCESS") @map("mock_profile") @db.VarChar(40)
+  enabled          Boolean  @default(true)
+  maxInputBytes    Int      @default(1048576) @map("max_input_bytes")
+  maxEvidenceItems Int      @default(25) @map("max_evidence_items")
+  timeoutMs        Int      @default(10000) @map("timeout_ms")
+  retryLimit       Int      @default(3) @map("retry_limit")
+  createdBy        String   @map("created_by") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([organizationId, code])
+  @@map("ai_runtime_configs")
+}
+
+model ModelPolicy {
+  id                      String   @id @default(uuid()) @db.Uuid
+  organizationId          String?  @map("organization_id") @db.Uuid
+  code                    String   @db.VarChar(80)
+  enabled                 Boolean  @default(true)
+  runtimeConfigId         String   @map("runtime_config_id") @db.Uuid
+  promptTemplateVersionId String   @map("prompt_template_version_id") @db.Uuid
+  allowedClassifications  Json     @map("allowed_classifications_json")
+  allowedMediaTypes       Json     @map("allowed_media_types_json")
+  purpose                 String   @db.VarChar(240)
+  createdBy               String   @map("created_by") @db.Uuid
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([organizationId, code])
+  @@map("model_policies")
+}
+
+model PromptTemplate {
+  id             String                  @id @default(uuid()) @db.Uuid
+  organizationId String?                 @map("organization_id") @db.Uuid
+  code           String                  @db.VarChar(80)
+  name           String                  @db.VarChar(200)
+  createdBy      String                  @map("created_by") @db.Uuid
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz
+  versions       PromptTemplateVersion[]
+
+  @@unique([organizationId, code])
+  @@map("prompt_templates")
+}
+
+model PromptTemplateVersion {
+  id               String           @id @default(uuid()) @db.Uuid
+  promptTemplateId String           @map("prompt_template_id") @db.Uuid
+  versionNumber    Int              @map("version_number")
+  status           GovernanceStatus @default(DRAFT)
+  systemPrompt     String           @map("system_prompt") @db.Text
+  outputSchema     Json             @map("output_schema_json")
+  publishedBy      String?          @map("published_by") @db.Uuid
+  publishedAt      DateTime?        @map("published_at") @db.Timestamptz
+  retiredAt        DateTime?        @map("retired_at") @db.Timestamptz
+  createdBy        String           @map("created_by") @db.Uuid
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  template         PromptTemplate   @relation(fields: [promptTemplateId], references: [id], onDelete: Cascade)
+
+  @@unique([promptTemplateId, versionNumber])
+  @@map("prompt_template_versions")
+}
+
+model RedactionPolicy {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  code           String   @db.VarChar(80)
+  enabled        Boolean  @default(true)
+  patterns       Json     @map("patterns_json")
+  replacement    String   @default("[REDACTED]") @db.VarChar(80)
+  createdBy      String   @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([organizationId, code])
+  @@map("redaction_policies")
+}
+
+model AiKillSwitch {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  scope          String   @db.VarChar(80)
+  enabled        Boolean  @default(false)
+  reason         String?  @db.VarChar(500)
+  updatedBy      String   @map("updated_by") @db.Uuid
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([organizationId, scope])
+  @@map("ai_kill_switches")
+}
+
+model Assessment {
+  id                      String                 @id @default(uuid()) @db.Uuid
+  organizationId          String                 @map("organization_id") @db.Uuid
+  caseId                  String                 @map("case_id") @db.Uuid
+  workflowInstanceId      String                 @map("workflow_instance_id") @db.Uuid
+  workflowVersion         Int                    @map("workflow_version")
+  validationRunId         String                 @map("validation_run_id") @db.Uuid
+  caseVersion             Int                    @map("case_version")
+  modelPolicyId           String                 @map("model_policy_id") @db.Uuid
+  runtimeConfigId         String                 @map("runtime_config_id") @db.Uuid
+  promptTemplateVersionId String                 @map("prompt_template_version_id") @db.Uuid
+  status                  AssessmentStatus       @default(QUEUED)
+  purpose                 String                 @db.VarChar(240)
+  requestedBy             String                 @map("requested_by") @db.Uuid
+  requestedAt             DateTime               @default(now()) @map("requested_at") @db.Timestamptz
+  startedAt               DateTime?              @map("started_at") @db.Timestamptz
+  completedAt             DateTime?              @map("completed_at") @db.Timestamptz
+  cancelledAt             DateTime?              @map("cancelled_at") @db.Timestamptz
+  supersededAt            DateTime?              @map("superseded_at") @db.Timestamptz
+  statusReasonCode        String?                @map("status_reason_code") @db.VarChar(100)
+  rowVersion              Int                    @default(1) @map("row_version")
+  inputFingerprint        String?                @map("input_fingerprint") @db.Char(64)
+  refs                    AssessmentInputRef[]
+  prepared                PreparedInput?
+  executions              AssessmentExecution[]
+  output                  AssessmentOutput?
+  feedback                AssessmentFeedback[]
+  acceptances             AssessmentAcceptance[]
+  usage                   AssessmentUsage?
+  lease                   AssessmentJobLease?
+  failures                AssessmentFailure[]
+
+  @@index([organizationId, caseId, requestedAt])
+  @@index([status, requestedAt])
+  @@map("assessments")
+}
+
+model AssessmentInputRef {
+  id                 String     @id @default(uuid()) @db.Uuid
+  assessmentId       String     @map("assessment_id") @db.Uuid
+  evidenceAssetId    String     @map("evidence_asset_id") @db.Uuid
+  evidenceVersionId  String     @map("evidence_version_id") @db.Uuid
+  sha256             String     @db.Char(64)
+  classificationCode String     @map("classification_code") @db.VarChar(100)
+  mediaType          String?    @map("media_type") @db.VarChar(160)
+  sizeBytes          BigInt?    @map("size_bytes")
+  availableAt        DateTime   @map("available_at") @db.Timestamptz
+  assessment         Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, evidenceVersionId])
+  @@map("assessment_input_refs")
+}
+
+model PreparedInput {
+  id               String     @id @default(uuid()) @db.Uuid
+  assessmentId     String     @unique @map("assessment_id") @db.Uuid
+  caseSnapshot     Json       @map("case_snapshot_json")
+  workflowSnapshot Json       @map("workflow_snapshot_json")
+  contentRecords   Json       @map("content_records_json")
+  excludedRecords  Json       @map("excluded_records_json")
+  byteCount        Int        @map("byte_count")
+  fingerprint      String     @db.Char(64)
+  preparedAt       DateTime   @default(now()) @map("prepared_at") @db.Timestamptz
+  assessment       Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@map("prepared_inputs")
+}
+
+model AssessmentExecution {
+  id                  String     @id @default(uuid()) @db.Uuid
+  assessmentId        String     @map("assessment_id") @db.Uuid
+  attemptNumber       Int        @map("attempt_number")
+  adapterMode         String     @map("adapter_mode") @db.VarChar(40)
+  mockProfile         String?    @map("mock_profile") @db.VarChar(40)
+  providerExecutionId String?    @map("provider_execution_id") @db.VarChar(160)
+  status              String     @db.VarChar(40)
+  submittedAt         DateTime?  @map("submitted_at") @db.Timestamptz
+  completedAt         DateTime?  @map("completed_at") @db.Timestamptz
+  latencyMs           Int?       @map("latency_ms")
+  rawOutputEncrypted  String?    @map("raw_output_encrypted") @db.Text
+  errorCode           String?    @map("error_code") @db.VarChar(100)
+  assessment          Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, attemptNumber])
+  @@map("assessment_executions")
+}
+
+model AssessmentOutput {
+  id                 String                         @id @default(uuid()) @db.Uuid
+  assessmentId       String                         @unique @map("assessment_id") @db.Uuid
+  summary            String                         @db.VarChar(4000)
+  recommendation     String                         @db.VarChar(80)
+  confidence         Int
+  schemaVersion      String                         @map("schema_version") @db.VarChar(20)
+  validatedAt        DateTime                       @default(now()) @map("validated_at") @db.Timestamptz
+  assessment         Assessment                     @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  findings           AssessmentFinding[]
+  missingInformation AssessmentMissingInformation[]
+  riskIndicators     AssessmentRiskIndicator[]
+  citations          AssessmentCitation[]
+
+  @@map("assessment_outputs")
+}
+
+model AssessmentFinding {
+  id       String           @id @default(uuid()) @db.Uuid
+  outputId String           @map("output_id") @db.Uuid
+  code     String           @db.VarChar(80)
+  title    String           @db.VarChar(200)
+  detail   String           @db.VarChar(2000)
+  severity String           @db.VarChar(20)
+  output   AssessmentOutput @relation(fields: [outputId], references: [id], onDelete: Cascade)
+
+  @@unique([outputId, code])
+  @@map("assessment_findings")
+}
+
+model AssessmentMissingInformation {
+  id       String           @id @default(uuid()) @db.Uuid
+  outputId String           @map("output_id") @db.Uuid
+  code     String           @db.VarChar(80)
+  label    String           @db.VarChar(240)
+  required Boolean          @default(false)
+  output   AssessmentOutput @relation(fields: [outputId], references: [id], onDelete: Cascade)
+
+  @@unique([outputId, code])
+  @@map("assessment_missing_information")
+}
+
+model AssessmentRiskIndicator {
+  id       String           @id @default(uuid()) @db.Uuid
+  outputId String           @map("output_id") @db.Uuid
+  code     String           @db.VarChar(80)
+  label    String           @db.VarChar(240)
+  severity String           @db.VarChar(20)
+  output   AssessmentOutput @relation(fields: [outputId], references: [id], onDelete: Cascade)
+
+  @@unique([outputId, code])
+  @@map("assessment_risk_indicators")
+}
+
+model AssessmentCitation {
+  id                String           @id @default(uuid()) @db.Uuid
+  outputId          String           @map("output_id") @db.Uuid
+  code              String           @db.VarChar(80)
+  evidenceAssetId   String           @map("evidence_asset_id") @db.Uuid
+  evidenceVersionId String           @map("evidence_version_id") @db.Uuid
+  excerpt           String?          @db.VarChar(1000)
+  output            AssessmentOutput @relation(fields: [outputId], references: [id], onDelete: Cascade)
+
+  @@unique([outputId, code])
+  @@map("assessment_citations")
+}
+
+model AssessmentFeedback {
+  id           String     @id @default(uuid()) @db.Uuid
+  assessmentId String     @map("assessment_id") @db.Uuid
+  actorId      String     @map("actor_id") @db.Uuid
+  rating       String     @db.VarChar(20)
+  comment      String?    @db.VarChar(2000)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@map("assessment_feedback")
+}
+
+model AssessmentAcceptance {
+  id              String                     @id @default(uuid()) @db.Uuid
+  assessmentId    String                     @map("assessment_id") @db.Uuid
+  actorId         String                     @map("actor_id") @db.Uuid
+  workflowDraftId String                     @map("workflow_draft_id") @db.Uuid
+  acceptedAt      DateTime                   @default(now()) @map("accepted_at") @db.Timestamptz
+  assessment      Assessment                 @relation(fields: [assessmentId], references: [id], onDelete: Restrict)
+  items           AssessmentAcceptanceItem[]
+
+  @@map("assessment_acceptances")
+}
+
+model AssessmentAcceptanceItem {
+  id           String               @id @default(uuid()) @db.Uuid
+  acceptanceId String               @map("acceptance_id") @db.Uuid
+  itemType     String               @map("item_type") @db.VarChar(40)
+  itemCode     String               @map("item_code") @db.VarChar(80)
+  acceptance   AssessmentAcceptance @relation(fields: [acceptanceId], references: [id], onDelete: Cascade)
+
+  @@unique([acceptanceId, itemType, itemCode])
+  @@map("assessment_acceptance_items")
+}
+
+model AssessmentUsage {
+  id                String     @id @default(uuid()) @db.Uuid
+  assessmentId      String     @unique @map("assessment_id") @db.Uuid
+  inputBytes        Int        @map("input_bytes")
+  evidenceItemCount Int        @map("evidence_item_count")
+  outputBytes       Int        @map("output_bytes")
+  adapterMode       String     @map("adapter_mode") @db.VarChar(40)
+  assessment        Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@map("assessment_usage")
+}
+
+model AssessmentJobLease {
+  assessmentId  String     @id @map("assessment_id") @db.Uuid
+  owner         String     @db.VarChar(120)
+  expiresAt     DateTime   @map("expires_at") @db.Timestamptz
+  attempt       Int        @default(1)
+  nextAttemptAt DateTime?  @map("next_attempt_at") @db.Timestamptz
+  assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt, nextAttemptAt])
+  @@map("assessment_job_leases")
+}
+
+model AssessmentFailure {
+  id              String     @id @default(uuid()) @db.Uuid
+  assessmentId    String     @map("assessment_id") @db.Uuid
+  attemptNumber   Int        @map("attempt_number")
+  code            String     @db.VarChar(100)
+  retryable       Boolean
+  detailSanitized String?    @map("detail_sanitized") @db.VarChar(500)
+  occurredAt      DateTime   @default(now()) @map("occurred_at") @db.Timestamptz
+  assessment      Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@map("assessment_failures")
+}
+
+model IdempotencyRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  actorId        String   @map("actor_id") @db.Uuid
+  route          String   @db.VarChar(160)
+  key            String   @db.VarChar(200)
+  requestHash    String   @map("request_hash") @db.Char(64)
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([organizationId, actorId, route, key])
+  @@map("idempotency_records")
+}
+
+model InboxEvent {
+  eventId     String   @id @map("event_id") @db.Uuid
+  eventType   String   @map("event_type") @db.VarChar(160)
+  payloadHash String   @map("payload_hash") @db.Char(64)
+  processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz
+
+  @@map("inbox_events")
+}
+
+model OutboxEvent {
+  id               String    @id @default(uuid()) @db.Uuid
+  aggregateType    String    @map("aggregate_type") @db.VarChar(100)
+  aggregateId      String    @map("aggregate_id") @db.Uuid
+  aggregateVersion Int       @map("aggregate_version")
+  eventType        String    @map("event_type") @db.VarChar(160)
+  eventVersion     String    @map("event_version") @db.VarChar(20)
+  payload          Json
+  correlationId    String    @map("correlation_id") @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  actorType        String    @map("actor_type") @db.VarChar(20)
+  actorId          String    @map("actor_id") @db.Uuid
+  occurredAt       DateTime  @default(now()) @map("occurred_at") @db.Timestamptz
+  publishedAt      DateTime? @map("published_at") @db.Timestamptz
+  attempts         Int       @default(0)
+  nextAttemptAt    DateTime? @map("next_attempt_at") @db.Timestamptz
+
+  @@index([publishedAt, nextAttemptAt, occurredAt])
+  @@map("outbox_events")
+}
